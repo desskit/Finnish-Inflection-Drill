@@ -1,0 +1,23 @@
+{
+  "_comment": "Finnish noun cases offered by the drill. `id` is the stable internal key and matches the inflection-table keys produced by the extraction script. `label` is shown in UI. `ending_hint` appears as a hint label (e.g. the -ssA in inessive). Reorder/rename freely — the drill loads this at runtime.",
+  "cases": [
+    { "id": "nominative",  "label": "nominative",  "ending_hint": "" },
+    { "id": "genitive",    "label": "genitive",    "ending_hint": "-n" },
+    { "id": "partitive",   "label": "partitive",   "ending_hint": "-(t)A" },
+    { "id": "inessive",    "label": "inessive",    "ending_hint": "-ssA" },
+    { "id": "elative",     "label": "elative",     "ending_hint": "-stA" },
+    { "id": "illative",    "label": "illative",    "ending_hint": "-Vn / -hVn / -seen" },
+    { "id": "adessive",    "label": "adessive",    "ending_hint": "-llA" },
+    { "id": "ablative",    "label": "ablative",    "ending_hint": "-ltA" },
+    { "id": "allative",    "label": "allative",    "ending_hint": "-lle" },
+    { "id": "essive",      "label": "essive",      "ending_hint": "-nA" },
+    { "id": "translative", "label": "translative", "ending_hint": "-ksi" },
+    { "id": "abessive",    "label": "abessive",    "ending_hint": "-ttA" },
+    { "id": "instructive", "label": "instructive", "ending_hint": "-in", "plural_only": true },
+    { "id": "comitative",  "label": "comitative",  "ending_hint": "-ine", "plural_only": true }
+  ],
+  "numbers": [
+    { "id": "singular", "label": "Singular" },
+    { "id": "plural",   "label": "Plural" }
+  ]
+}

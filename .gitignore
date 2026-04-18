@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Raw downloaded data (too big for git, regenerate from scripts)
+scripts/raw/
+*.jsonl
+*.jsonl.gz
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local config
+.env

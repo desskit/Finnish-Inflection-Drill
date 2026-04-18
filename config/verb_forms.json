@@ -1,0 +1,37 @@
+{
+  "_comment": "Verb drill dimensions: tenses/moods, voices, polarities, and persons. Stable `id`s are used in data + stats. Edit labels freely. Participles and infinitives are treated as separate 'tenses' here to match the reference UI's grouping.",
+  "tenses": [
+    { "id": "present",            "label": "present" },
+    { "id": "perfect",            "label": "perfect" },
+    { "id": "past",               "label": "past" },
+    { "id": "pluperfect",         "label": "pluperfect" },
+    { "id": "conditional",        "label": "conditional" },
+    { "id": "conditional_perfect","label": "conditional perfect" },
+    { "id": "imperative",         "label": "imperative" },
+    { "id": "imperative_perfect", "label": "imperative perfect" },
+    { "id": "potential",          "label": "potential" },
+    { "id": "potential_perfect",  "label": "potential perfect" },
+    { "id": "inf1_long",          "label": "1st long infinitive" },
+    { "id": "inf2",               "label": "2nd infinitive" },
+    { "id": "inf3",               "label": "3rd infinitive" },
+    { "id": "inf4",               "label": "4th infinitive" },
+    { "id": "inf5",               "label": "5th infinitive" },
+    { "id": "participles",        "label": "participles" }
+  ],
+  "voices": [
+    { "id": "active",  "label": "active" },
+    { "id": "passive", "label": "passive" }
+  ],
+  "polarities": [
+    { "id": "positive", "label": "positive" },
+    { "id": "negative", "label": "negative" }
+  ],
+  "persons": [
+    { "id": "1sg", "label": "1sg (min\u00e4)"  },
+    { "id": "2sg", "label": "2sg (sin\u00e4)"  },
+    { "id": "3sg", "label": "3sg (h\u00e4n)"   },
+    { "id": "1pl", "label": "1pl (me)"        },
+    { "id": "2pl", "label": "2pl (te)"        },
+    { "id": "3pl", "label": "3pl (he)"        }
+  ]
+}
