@@ -1,0 +1,33 @@
+{
+  "_comment": "Maps Wiktionary's Finnish declension/conjugation template names to KOTUS type numbers. Each template is named after the canonical example word of its type. Edit if you find Wiktionary using a name we haven't mapped.",
+  "nouns": {
+    "fi-decl-valo": 1, "fi-decl-palvelu": 2, "fi-decl-valtio": 3,
+    "fi-decl-laatikko": 4, "fi-decl-risti": 5, "fi-decl-paperi": 6,
+    "fi-decl-ovi": 7, "fi-decl-nalle": 8, "fi-decl-kala": 9,
+    "fi-decl-koira": 10, "fi-decl-omena": 11, "fi-decl-kulkija": 12,
+    "fi-decl-katiska": 13, "fi-decl-solakka": 14, "fi-decl-korkea": 15,
+    "fi-decl-vanhempi": 16, "fi-decl-vapaa": 17, "fi-decl-maa": 18,
+    "fi-decl-suo": 19, "fi-decl-filee": 20, "fi-decl-rose": 21,
+    "fi-decl-ros\u00e9": 21, "fi-decl-parfait": 22, "fi-decl-tiili": 23,
+    "fi-decl-uni": 24, "fi-decl-toimi": 25, "fi-decl-pieni": 26,
+    "fi-decl-k\u00e4si": 27, "fi-decl-kynsi": 28, "fi-decl-lapsi": 29,
+    "fi-decl-veitsi": 30, "fi-decl-kaksi": 31, "fi-decl-sisar": 32,
+    "fi-decl-kytkin": 33, "fi-decl-onneton": 34, "fi-decl-l\u00e4mmin": 35,
+    "fi-decl-sisin": 36, "fi-decl-vasen": 37, "fi-decl-nainen": 38,
+    "fi-decl-vastaus": 39, "fi-decl-kalleus": 40, "fi-decl-vieras": 41,
+    "fi-decl-mies": 42, "fi-decl-ohut": 43, "fi-decl-kev\u00e4t": 44,
+    "fi-decl-kahdeksas": 45, "fi-decl-tuhat": 46, "fi-decl-kuollut": 47,
+    "fi-decl-hame": 48, "fi-decl-askel": 49
+  },
+  "verbs": {
+    "fi-conj-sanoa": 52, "fi-conj-muistaa": 53, "fi-conj-huutaa": 54,
+    "fi-conj-soutaa": 55, "fi-conj-kaivaa": 56, "fi-conj-saartaa": 57,
+    "fi-conj-laskea": 58, "fi-conj-tuntea": 59, "fi-conj-l\u00e4hte\u00e4": 60,
+    "fi-conj-sallia": 61, "fi-conj-voida": 62, "fi-conj-saada": 63,
+    "fi-conj-juoda": 64, "fi-conj-k\u00e4yd\u00e4": 65, "fi-conj-rohkaista": 66,
+    "fi-conj-tulla": 67, "fi-conj-tupakoida": 68, "fi-conj-valita": 69,
+    "fi-conj-juosta": 70, "fi-conj-n\u00e4hd\u00e4": 71, "fi-conj-vanheta": 72,
+    "fi-conj-salata": 73, "fi-conj-katketa": 74, "fi-conj-selvit\u00e4": 75,
+    "fi-conj-taitaa": 76, "fi-conj-kumajaa": 77, "fi-conj-kaikaa": 78
+  }
+}

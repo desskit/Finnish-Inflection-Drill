@@ -1,8 +1,8 @@
 {
   "_comment": "Verb groupings by infinitive ending. KOTUS verb types are mapped to the 6 traditional pedagogical groups. Edit `kotus_types` or labels if you want to change groupings.",
   "groups": [
-    { "id": "type1",  "label": "I (-VV)",       "example": "puhua, sanoa",   "kotus_types": [52, 53, 54, 55, 56, 57, 58, 59, 60, 61] },
-    { "id": "type2",  "label": "II (-da/-d\u00e4)", "example": "sy\u00f6d\u00e4, juoda", "kotus_types": [62, 63, 64] },
+    { "id": "type1",  "label": "I (-VV)",       "example": "puhua, sanoa",   "kotus_types": [52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 76, 77, 78] },
+    { "id": "type2",  "label": "II (-da/-d\u00e4)", "example": "sy\u00f6d\u00e4, juoda, n\u00e4hd\u00e4", "kotus_types": [62, 63, 64, 71] },
     { "id": "type3",  "label": "III (-CCV)",    "example": "menn\u00e4, tulla, nousta", "kotus_types": [65, 66, 67, 68, 69, 70] },
     { "id": "type4",  "label": "IV (-Vta/-Vt\u00e4)", "example": "haluta, tavata", "kotus_types": [73, 74] },
     { "id": "type5",  "label": "V (-ita/-it\u00e4)", "example": "valita, h\u00e4iritä", "kotus_types": [75] },

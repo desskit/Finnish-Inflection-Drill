@@ -5,18 +5,19 @@
     { "id": "o_oe",         "label": "-o / -\u00f6 stems",         "example": "talo, ty\u00f6",         "kotus_types": [1, 4] },
     { "id": "u_y",          "label": "-u / -y stems",              "example": "katu, kyky",           "kotus_types": [2, 3] },
     { "id": "i_new",        "label": "-i stems (new loans)",       "example": "pankki, bussi",        "kotus_types": [5, 6] },
-    { "id": "i_old",        "label": "-i stems (old, i\u2192e)",   "example": "suuri, vuosi, k\u00e4si", "kotus_types": [23, 24, 25, 26, 27, 28, 29, 30, 31] },
+    { "id": "i_old",        "label": "-i stems (old, i\u2192e)",   "example": "suuri, vuosi, k\u00e4si", "kotus_types": [7, 23, 24, 25, 26, 27, 28, 29, 30, 31] },
     { "id": "e",            "label": "-e stems",                   "example": "nalle, itse",          "kotus_types": [8] },
     { "id": "long_vowel",   "label": "long vowel / diphthong",     "example": "maa, ty\u00f6, vapaa", "kotus_types": [17, 18, 19, 20, 21, 22] },
     { "id": "nen",          "label": "-nen",                       "example": "nainen, hevonen",      "kotus_types": [38] },
-    { "id": "s",            "label": "-s stems",                   "example": "vieras, kangas",       "kotus_types": [41] },
+    { "id": "s",            "label": "-s stems",                   "example": "vieras, kangas, mies", "kotus_types": [41, 42, 45] },
     { "id": "us_ys",        "label": "-us / -ys",                  "example": "vastaus, kysymys",     "kotus_types": [39] },
     { "id": "uus_yys",      "label": "-uus / -yys (abstract)",     "example": "kauneus, yst\u00e4vyys", "kotus_types": [40] },
     { "id": "in",           "label": "-in (instruments)",          "example": "puhelin, avain",       "kotus_types": [33] },
     { "id": "ton_toen",     "label": "-(t)on / -(t)\u00f6n",       "example": "onneton",              "kotus_types": [34] },
     { "id": "ut_yt",        "label": "-ut / -yt",                  "example": "kevyt, ohut",          "kotus_types": [47] },
     { "id": "r_l",          "label": "-r / -l stems",              "example": "sisar, askel",         "kotus_types": [32] },
-    { "id": "other_cons",   "label": "other consonant stems",      "example": "olut, tuhat",          "kotus_types": [43, 44, 48, 49] },
+    { "id": "other_cons",   "label": "other consonant stems",      "example": "olut, tuhat, hame",    "kotus_types": [43, 44, 46, 48, 49] },
+    { "id": "irregular",    "label": "irregular / rare",           "example": "vanhempi, l\u00e4mmin, sisin, vasen", "kotus_types": [16, 35, 36, 37] },
     { "id": "other",        "label": "other / uncategorized",      "example": "",                     "kotus_types": [] }
   ]
 }
