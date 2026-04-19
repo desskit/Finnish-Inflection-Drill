@@ -92,7 +92,7 @@ function render() {
   el.translation.textContent = (word.translations || []).slice(0, 2).join(", ");
   const label = state.mode === "noun" ? nounLabel(key, state.cfg) : verbLabel(key, state.cfg);
   el.targetForm.textContent = label;
-  renderExamples(word);
+  renderExamples(word, word.inflections[key]);
   el.challenge.classList.remove("hidden");
   el.answerRow.classList.remove("hidden");
 }
@@ -116,9 +116,19 @@ function buildHighlightRegex(word) {
   return new RegExp(`(?<!\\p{L})(${esc.join("|")})(?!\\p{L})`, "giu");
 }
 
-function renderExamples(word) {
+function renderExamples(word, targetForm) {
   el.examples.innerHTML = "";
-  const exs = (word.examples || []).slice(0, 2);
+  // Drop any example that contains the target inflected form as a whole word —
+  // those would just spoil the answer. Unicode-aware boundaries so diacritics
+  // don't break the match.
+  const all = (word.examples || []).filter((ex) => {
+    const fi = typeof ex === "string" ? ex : ex.fi;
+    if (!fi || !targetForm) return !!fi;
+    const esc = targetForm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const spoiler = new RegExp(`(?<!\\p{L})${esc}(?!\\p{L})`, "iu");
+    return !spoiler.test(fi);
+  });
+  const exs = all.slice(0, 2);
   if (exs.length === 0) { el.examples.classList.add("hidden"); return; }
 
   const re = buildHighlightRegex(word);
