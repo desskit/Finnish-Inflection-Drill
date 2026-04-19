@@ -508,16 +508,35 @@ kbd {
 /* ---------- About panel ---------- */
 .about h2 {
   color: var(--accent);
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   margin: 0 0 0.6rem;
   letter-spacing: -0.01em;
   font-weight: 600;
 }
+.about h3 {
+  color: var(--text);
+  font-size: 0.98rem;
+  margin: 1.5rem 0 0.45rem;
+  letter-spacing: -0.005em;
+  font-weight: 600;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+.about h3:first-of-type { border-top: none; padding-top: 0; }
 .about p {
   color: var(--text-dim);
   line-height: 1.65;
   margin: 0.5rem 0;
 }
+.about ul {
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin: 0.4rem 0 0.8rem;
+  padding-left: 1.2rem;
+}
+.about ul li { margin: 0.3rem 0; }
+.about ul li::marker { color: var(--muted-soft); }
+.about strong { color: var(--text); font-weight: 600; }
 .about a {
   color: var(--accent);
   text-decoration: none;
@@ -525,6 +544,21 @@ kbd {
   transition: border-color var(--dur) var(--ease);
 }
 .about a:hover { border-bottom-color: var(--accent); }
+
+/* Keyboard-shortcut list reads better as a compact two-column grid. */
+.about .shortcuts {
+  list-style: none;
+  padding-left: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.25rem 1rem;
+}
+.about .shortcuts li {
+  margin: 0;
+  padding: 0.2rem 0;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
 
 /* ---------- Stats panel ---------- */
 .stats-panel summary {

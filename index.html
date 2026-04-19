@@ -71,6 +71,87 @@
     <section id="about" class="panel about hidden" aria-label="About">
       <h2>About</h2>
       <p>
+        A drilling app for Finnish noun cases and verb conjugations. Pick a
+        mode, narrow the pool with filters if you want, and type the inflected
+        form for each prompt until your thumbs know it by heart.
+      </p>
+
+      <h3>How a drill works</h3>
+      <p>
+        You're shown a Finnish lemma (the dictionary form) and a target
+        inflection. Type the correct form and press <kbd>Enter</kbd>. If
+        you're wrong, the expected answer appears &mdash; press
+        <kbd>Enter</kbd> again to move on. If you're right, the next challenge
+        loads automatically.
+      </p>
+      <p>
+        Where Wiktionary has them, each challenge also shows up to two example
+        sentences with English translations. Sentences that would give away
+        the answer are filtered out automatically.
+      </p>
+
+      <h3>Modes</h3>
+      <ul>
+        <li>
+          <strong>Nouns</strong> &mdash; drills cases (nominative, genitive,
+          partitive, etc.) in singular and plural. Toggle cases in the grid or
+          limit the pool to specific KOTUS noun types.
+        </li>
+        <li>
+          <strong>Verbs</strong> &mdash; drills conjugations across tense,
+          voice, polarity, and person. Filter by any of those axes and by
+          verb type (1&ndash;6).
+        </li>
+      </ul>
+
+      <h3>Test mode</h3>
+      <p>
+        Set a number of questions and the app runs them back-to-back without
+        showing whether each one was right. At the end you get accuracy plus a
+        review list of anything you missed. Statistics still update normally.
+      </p>
+
+      <h3>Settings</h3>
+      <ul>
+        <li>
+          <strong>Require correct answer to advance</strong> &mdash; wrong
+          answers don't auto-reveal; keep trying until you get it.
+        </li>
+        <li>
+          <strong>Speak answer automatically</strong> &mdash; play the correct
+          form aloud when it's revealed.
+        </li>
+        <li>
+          <strong>Hide answers longer than N characters</strong> &mdash; skips
+          awkwardly long forms (partitive plurals, compounds, etc.).
+        </li>
+      </ul>
+
+      <h3>Hints &amp; shortcuts</h3>
+      <ul class="shortcuts">
+        <li><kbd>Enter</kbd> &mdash; submit / advance</li>
+        <li><kbd>;</kbd> &mdash; reveal the next letter</li>
+        <li><kbd>.</kbd> &mdash; show the full answer</li>
+        <li><kbd>-</kbd> &mdash; skip this word</li>
+        <li><kbd>'</kbd> &mdash; speak the expected answer</li>
+      </ul>
+
+      <h3>Audio</h3>
+      <p>
+        Audio uses your device's built-in text-to-speech. Most desktops and
+        phones have a Finnish voice installed. If yours doesn't, you'll see a
+        warning in Settings and the audio buttons are disabled.
+      </p>
+
+      <h3>Offline &amp; install</h3>
+      <p>
+        This is a Progressive Web App &mdash; once loaded, it works offline.
+        From your browser's menu you can install it to launch like a native
+        app.
+      </p>
+
+      <h3>Credits</h3>
+      <p>
         Inspired by
         <a href="https://tragram.github.io/finnish-inflexion-drill/"
            target="_blank" rel="noopener">Finnish Inflexion Drill</a>
@@ -82,12 +163,11 @@
         <a href="https://en.wiktionary.org/" target="_blank" rel="noopener">English Wiktionary</a>'s
         Finnish entries via the machine-readable dumps at
         <a href="https://kaikki.org/dictionary/Finnish/" target="_blank" rel="noopener">kaikki.org</a>.
-      </p>
-      <p>
         Wiktionary content is licensed under
         <a href="https://creativecommons.org/licenses/by-sa/4.0/"
            target="_blank" rel="noopener">CC&nbsp;BY-SA&nbsp;4.0</a>.
       </p>
+
       <p class="about-version">Version <span id="about-version"></span></p>
     </section>
 
