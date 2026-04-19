@@ -16,7 +16,7 @@
 <body>
   <main id="app">
     <header class="app-header">
-      <h1>Finnish Drill</h1>
+      <h1>Finnish Drill <small id="app-version" class="version"></small></h1>
       <div class="mode-switch" role="tablist">
         <button id="mode-noun"  class="mode-btn" role="tab" aria-selected="true">Nouns</button>
         <button id="mode-verb"  class="mode-btn" role="tab" aria-selected="false">Verbs</button>
@@ -78,9 +78,10 @@
         <a href="https://creativecommons.org/licenses/by-sa/4.0/"
            target="_blank" rel="noopener">CC&nbsp;BY-SA&nbsp;4.0</a>.
       </p>
+      <p class="about-version">Version <span id="about-version"></span></p>
     </section>
 
-    <section class="panel" aria-label="Settings">
+    <section id="settings-panel" class="panel" aria-label="Settings">
       <div class="filter-section-head">
         <h2>Settings</h2>
       </div>
@@ -94,9 +95,42 @@
         <span class="group-label">Speak answer automatically</span>
         <span class="group-example">play the correct form out loud when revealed</span>
       </label>
+      <label class="group-row">
+        <input id="setting-exclude-long" type="checkbox" />
+        <span class="group-label">
+          Hide answers longer than
+          <input id="setting-max-length" type="number" min="5" max="40"
+                 class="inline-number" />
+          characters
+        </span>
+        <span class="group-example">skips awkward partitive-plural, compound, etc.</span>
+      </label>
       <p id="tts-warning" class="tts-warning hidden">
         No Finnish voice installed on this device &mdash; audio will be silent.
       </p>
+    </section>
+
+    <section id="test-panel" class="panel" aria-label="Test mode">
+      <div class="filter-section-head">
+        <h2>Test mode</h2>
+      </div>
+      <p class="panel-description">
+        Answer a fixed number of questions without seeing your results until
+        the end. Stats still update as normal.
+      </p>
+      <div id="test-idle" class="test-controls">
+        <label>
+          Questions:
+          <input id="test-length" type="number" min="1" max="500"
+                 class="inline-number" />
+        </label>
+        <button id="test-start" type="button" class="mode-btn">Start test</button>
+      </div>
+      <div id="test-running" class="test-progress hidden">
+        <span>Question <span id="test-current">1</span> of <span id="test-total">10</span></span>
+        <button id="test-cancel" type="button" class="mini-btn">Cancel</button>
+      </div>
+      <div id="test-results" class="test-results hidden"></div>
     </section>
 
     <details id="stats-panel" class="panel stats-panel">

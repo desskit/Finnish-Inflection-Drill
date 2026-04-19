@@ -12,8 +12,11 @@ const KEY = "settings_v1";
 
 export function defaultSettings() {
   return {
-    requireCorrect: false,
-    autoPlayAudio:  true,
+    requireCorrect:  false,
+    autoPlayAudio:   true,
+    excludeLong:     false,
+    maxAnswerLength: 15,  // only used when excludeLong is true
+    testLength:      10,
   };
 }
 
