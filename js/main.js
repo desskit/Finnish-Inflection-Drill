@@ -16,7 +16,8 @@ import { speak, ttsAvailable, cancelSpeech } from "./tts.js";
 
 // ---------- state ----------
 const state = {
-  mode: "noun",             // "noun" | "verb"
+  mode: "noun",             // "noun" | "verb" — which pool we're drilling
+  view: "drill",            // "drill" | "about" — which top-level view is shown
   cfg: null,
   data: null,
   pool: [],
@@ -34,6 +35,8 @@ const state = {
 const el = {
   modeNoun:        document.getElementById("mode-noun"),
   modeVerb:        document.getElementById("mode-verb"),
+  modeAbout:       document.getElementById("mode-about"),
+  about:           document.getElementById("about"),
   challenge:       document.getElementById("challenge"),
   answerRow:       document.getElementById("answer-row"),
   headword:        document.getElementById("headword"),
@@ -275,15 +278,40 @@ function rebuildPool() {
   newChallenge();
 }
 
+// Reflect current tab selection on the three buttons.
+function updateTabAria() {
+  const drill = state.view === "drill";
+  el.modeNoun.setAttribute("aria-selected",  drill && state.mode === "noun" ? "true" : "false");
+  el.modeVerb.setAttribute("aria-selected",  drill && state.mode === "verb" ? "true" : "false");
+  el.modeAbout.setAttribute("aria-selected", state.view === "about"          ? "true" : "false");
+}
+
+// Show or hide the drill UI vs the about panel. Doesn't touch the drill
+// state (pool, current challenge, stats) — clicking About and back should
+// leave your place.
+function setView(view) {
+  state.view = view;
+  const drill = view === "drill";
+  // Drill-only chrome: only show if we're in drill view AND we have something
+  // to drill (otherwise the "hidden" class from newChallenge wins).
+  el.challenge.classList.toggle("hidden", !(drill && state.current));
+  el.answerRow.classList.toggle("hidden", !(drill && state.current));
+  el.filtersNoun.classList.toggle("hidden", !(drill && state.mode === "noun"));
+  el.filtersVerb.classList.toggle("hidden", !(drill && state.mode === "verb"));
+  el.about.classList.toggle("hidden", drill);
+  updateTabAria();
+  if (drill) el.answer.focus();
+}
+
 function setMode(mode) {
+  const changed = state.mode !== mode;
   state.mode = mode;
-  el.modeNoun.setAttribute("aria-selected", mode === "noun" ? "true" : "false");
-  el.modeVerb.setAttribute("aria-selected", mode === "verb" ? "true" : "false");
-
-  el.filtersNoun.classList.toggle("hidden", mode !== "noun");
-  el.filtersVerb.classList.toggle("hidden", mode !== "verb");
-
-  rebuildPool();
+  // Always return to the drill view; rebuild the pool only if the mode
+  // actually changed, so clicking "Nouns" while already in noun mode doesn't
+  // randomize the current challenge.
+  setView("drill");
+  if (changed) rebuildPool();
+  else updateStatus();
 }
 
 // ---------- boot ----------
@@ -352,8 +380,9 @@ async function boot() {
       }
     });
 
-    el.modeNoun.addEventListener("click", () => setMode("noun"));
-    el.modeVerb.addEventListener("click", () => setMode("verb"));
+    el.modeNoun.addEventListener("click",  () => setMode("noun"));
+    el.modeVerb.addEventListener("click",  () => setMode("verb"));
+    el.modeAbout.addEventListener("click", () => setView("about"));
 
     el.hintLetter.addEventListener("click", revealNextLetter);
     el.hintAnswer.addEventListener("click", showFullAnswer);

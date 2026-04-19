@@ -18,8 +18,9 @@
     <header class="app-header">
       <h1>Finnish Drill</h1>
       <div class="mode-switch" role="tablist">
-        <button id="mode-noun" class="mode-btn" role="tab" aria-selected="true">Nouns</button>
-        <button id="mode-verb" class="mode-btn" role="tab" aria-selected="false">Verbs</button>
+        <button id="mode-noun"  class="mode-btn" role="tab" aria-selected="true">Nouns</button>
+        <button id="mode-verb"  class="mode-btn" role="tab" aria-selected="false">Verbs</button>
+        <button id="mode-about" class="mode-btn" role="tab" aria-selected="false">About</button>
       </div>
     </header>
 
@@ -56,6 +57,28 @@
 
     <section id="filters-noun" class="panel filters hidden" aria-label="Noun filters"></section>
     <section id="filters-verb" class="panel filters hidden" aria-label="Verb filters"></section>
+
+    <section id="about" class="panel about hidden" aria-label="About">
+      <h2>About</h2>
+      <p>
+        Inspired by
+        <a href="https://tragram.github.io/finnish-inflexion-drill/"
+           target="_blank" rel="noopener">Finnish Inflexion Drill</a>
+        by tragram.
+      </p>
+      <p>
+        All word data, translations, and example sentences are scraped from
+        the
+        <a href="https://en.wiktionary.org/" target="_blank" rel="noopener">English Wiktionary</a>'s
+        Finnish entries via the machine-readable dumps at
+        <a href="https://kaikki.org/dictionary/Finnish/" target="_blank" rel="noopener">kaikki.org</a>.
+      </p>
+      <p>
+        Wiktionary content is licensed under
+        <a href="https://creativecommons.org/licenses/by-sa/4.0/"
+           target="_blank" rel="noopener">CC&nbsp;BY-SA&nbsp;4.0</a>.
+      </p>
+    </section>
 
     <section class="panel" aria-label="Settings">
       <div class="filter-section-head">

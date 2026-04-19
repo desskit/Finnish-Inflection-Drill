@@ -39,7 +39,7 @@ main {
 
 h1 { color: var(--accent); margin: 0; font-size: 1.4rem; }
 
-.mode-switch { display: flex; gap: 0.5rem; }
+.mode-switch { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .mode-btn {
   background: var(--panel);
   color: var(--text);
@@ -48,6 +48,9 @@ h1 { color: var(--accent); margin: 0; font-size: 1.4rem; }
   padding: 0.4rem 0.9rem;
   cursor: pointer;
   font-size: 0.95rem;
+}
+@media (max-width: 420px) {
+  .mode-btn { padding: 0.35rem 0.65rem; font-size: 0.9rem; }
 }
 .mode-btn[aria-selected="true"] {
   background: var(--accent);
@@ -239,6 +242,21 @@ kbd {
 .group-row input[type="checkbox"] { cursor: pointer; }
 .group-label { color: var(--text); }
 .group-example { color: var(--muted); font-size: 0.85em; font-style: italic; }
+
+/* --- About panel --- */
+.about h2 {
+  color: var(--accent);
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+  letter-spacing: 0.02em;
+}
+.about p {
+  color: var(--text);
+  line-height: 1.55;
+  margin: 0.5rem 0;
+}
+.about a { color: var(--accent); text-decoration: none; }
+.about a:hover { text-decoration: underline; }
 
 /* --- Stats panel --- */
 .stats-panel summary {
