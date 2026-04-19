@@ -100,28 +100,43 @@ function renderExamples(word) {
   if (exs.length === 0) { el.examples.classList.add("hidden"); return; }
 
   const re = buildHighlightRegex(word);
-  for (const text of exs) {
+  for (const ex of exs) {
+    // Handle legacy plain-string shape as a fallback so old cached data
+    // doesn't crash the UI before the service worker picks up fresh data.
+    const fi = typeof ex === "string" ? ex : ex.fi;
+    const en = typeof ex === "string" ? ""  : (ex.en || "");
+    if (!fi) continue;
+
     const li = document.createElement("li");
-    if (re) {
-      // Split on matches and rebuild with <span class="ex-highlight"> wraps.
-      let lastIdx = 0;
-      let m;
-      re.lastIndex = 0;
-      while ((m = re.exec(text)) !== null) {
-        if (m.index > lastIdx) li.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
-        const span = document.createElement("span");
-        span.className = "ex-highlight";
-        span.textContent = m[0];
-        li.appendChild(span);
-        lastIdx = m.index + m[0].length;
-      }
-      if (lastIdx < text.length) li.appendChild(document.createTextNode(text.slice(lastIdx)));
-    } else {
-      li.textContent = text;
+    const fiDiv = document.createElement("div");
+    fiDiv.className = "ex-fi";
+    appendHighlighted(fiDiv, fi, re);
+    li.appendChild(fiDiv);
+    if (en) {
+      const enDiv = document.createElement("div");
+      enDiv.className = "ex-en";
+      enDiv.textContent = en;
+      li.appendChild(enDiv);
     }
     el.examples.appendChild(li);
   }
   el.examples.classList.remove("hidden");
+}
+
+function appendHighlighted(parent, text, re) {
+  if (!re) { parent.textContent = text; return; }
+  let lastIdx = 0;
+  let m;
+  re.lastIndex = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIdx) parent.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
+    const span = document.createElement("span");
+    span.className = "ex-highlight";
+    span.textContent = m[0];
+    parent.appendChild(span);
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) parent.appendChild(document.createTextNode(text.slice(lastIdx)));
 }
 
 function speakHeadword() {

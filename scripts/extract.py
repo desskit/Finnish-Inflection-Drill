@@ -226,15 +226,18 @@ def extract_audio(entry: dict) -> str | None:
     return None
 
 
-def extract_examples(entry: dict) -> list[str]:
-    out: list[str] = []
+def extract_examples(entry: dict) -> list[dict]:
+    """Return a list of {fi, en} pairs. `en` may be empty if no translation."""
+    out: list[dict] = []
     for sense in entry.get("senses") or []:
         for ex in sense.get("examples") or []:
-            text = ex.get("text")
-            if text:
-                out.append(text)
-                if len(out) >= 3:
-                    return out
+            fi = ex.get("text")
+            if not fi:
+                continue
+            en = ex.get("english") or ex.get("translation") or ""
+            out.append({"fi": fi, "en": en})
+            if len(out) >= 3:
+                return out
     return out
 
 

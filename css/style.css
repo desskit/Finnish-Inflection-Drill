@@ -114,6 +114,8 @@ h1 { color: var(--accent); margin: 0; font-size: 1.4rem; }
 }
 .examples li:first-child { border-top: none; }
 .examples .ex-highlight { color: var(--accent); font-style: normal; font-weight: 500; }
+.examples .ex-fi { color: var(--text); font-style: italic; }
+.examples .ex-en { color: var(--muted); font-style: normal; font-size: 0.85rem; margin-top: 0.15rem; }
 
 /* TTS warning — shown when no Finnish voice is installed. */
 .tts-warning {
@@ -205,6 +207,8 @@ kbd {
   border-bottom: 1px solid transparent;
 }
 .case-grid thead th { color: var(--muted); font-weight: 500; font-size: 0.9rem; }
+/* Keep "Singular" / "Plural" on one line with their checkbox on narrow screens. */
+.case-grid thead th label { white-space: nowrap; }
 .case-grid .case-name { color: var(--text); }
 .case-grid .case-cell { width: 80px; text-align: center; }
 .case-grid .case-cell.disabled { opacity: 0.2; }
@@ -272,7 +276,7 @@ kbd {
   margin: 1rem 0 0.3rem;
   letter-spacing: 0.02em;
 }
-.stats-section { margin: 0.6rem 0 1rem; }
+.stats-section { margin: 0.6rem 0 1rem; overflow-x: auto; }
 .stats-section h3 {
   color: var(--muted);
   font-size: 0.85rem;
@@ -308,6 +312,15 @@ kbd {
 .stats-table td.num,
 .stats-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .stats-table tbody tr:hover { background: rgba(96, 165, 250, 0.05); }
+
+/* On narrow screens the 6-column stats table can't fit; tighten padding and
+   let individual sections scroll horizontally instead of the whole page. */
+@media (max-width: 600px) {
+  .stats-table { font-size: 0.82rem; }
+  .stats-table th,
+  .stats-table td { padding: 0.2rem 0.35rem; }
+  .stats-overall { font-size: 0.95rem; }
+}
 
 /* --- Status --- */
 .status-line {
