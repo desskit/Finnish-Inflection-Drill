@@ -1,6 +1,6 @@
 {
   "name": "Finnish Inflection Drill",
-  "short_name": "Finnish Drill",
+  "short_name": "Finnish Inflection Drill",
   "description": "Drill Finnish noun cases and verb conjugations.",
   "start_url": "./index.html",
   "scope": "./",

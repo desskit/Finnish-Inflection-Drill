@@ -30,14 +30,21 @@ export function buildNounPool(data, filters) {
 
 /**
  * Parse a verb inflection key into its dimensions. Handles three shapes:
- *   "participle_<tense>_<voice>"           → kind=participle
- *   "inf<n>[_long]_<voice>"                → kind=infinitive
- *   "<tense>_<voice>_<polarity>[_<person>]"→ kind=finite
+ *   "participle_<tense>_<voice>"             → kind=participle
+ *   "inf<n>[_long]_<voice>"                  → kind=infinitive
+ *   "<tense>_<voice>_<polarity>[_<person>]"  → kind=finite
  *
- * For filtering, both participles and infinitives are treated as their own
- * "tense" in the config (the tense list includes `inf1_long` .. `inf5` and
- * `participles`).
+ * Finite tenses can be a single token (present, past, perfect, pluperfect,
+ * conditional, imperative, potential) OR a two-token compound mood+aspect
+ * (conditional_perfect, imperative_perfect, potential_perfect). We split
+ * greedy-longest to disambiguate.
  */
+const COMPOUND_TENSES = new Set([
+  "conditional_perfect",
+  "imperative_perfect",
+  "potential_perfect",
+]);
+
 export function parseVerbKey(key) {
   const parts = key.split("_");
   if (parts[0] === "participle") {
@@ -54,7 +61,16 @@ export function parseVerbKey(key) {
     const tense = parts.slice(0, -1).join("_");
     return { kind: "infinitive", tense, voice, polarity: null, person: null };
   }
-  const [tense, voice, polarity, person] = parts;
+  const twoTok = parts[0] + "_" + parts[1];
+  let tense, rest;
+  if (COMPOUND_TENSES.has(twoTok)) {
+    tense = twoTok;
+    rest = parts.slice(2);
+  } else {
+    tense = parts[0];
+    rest = parts.slice(1);
+  }
+  const [voice, polarity, person] = rest;
   return { kind: "finite", tense, voice, polarity, person: person || null };
 }
 

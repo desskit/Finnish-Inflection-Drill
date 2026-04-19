@@ -40,7 +40,21 @@ export function verbLabel(key, cfg) {
   }
 
   // Finite: "<tense>_<voice>_<polarity>[_<person>]"
-  const [tenseId, voiceId, polarityId, personId] = parts;
+  // Tense can be a compound mood+aspect like "conditional_perfect" — take
+  // two tokens when they form a known compound, otherwise one.
+  const compound = new Set([
+    "conditional_perfect", "imperative_perfect", "potential_perfect",
+  ]);
+  const twoTok = parts[0] + "_" + parts[1];
+  let tenseId, rest;
+  if (compound.has(twoTok)) {
+    tenseId = twoTok;
+    rest = parts.slice(2);
+  } else {
+    tenseId = parts[0];
+    rest = parts.slice(1);
+  }
+  const [voiceId, polarityId, personId] = rest;
   const tense = byId(cfg.verbForms.tenses, tenseId);
   const voice = byId(cfg.verbForms.voices, voiceId);
   const polarity = byId(cfg.verbForms.polarities, polarityId);

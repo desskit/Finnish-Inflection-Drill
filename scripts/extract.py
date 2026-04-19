@@ -127,12 +127,9 @@ CASE_TAGS = {
 }
 NUMBER_TAGS = {"singular", "plural"}
 
-# Verb tag mappings.
-TENSE_TAGS = {
-    "present": "present", "past": "past", "perfect": "perfect",
-    "pluperfect": "pluperfect", "conditional": "conditional",
-    "imperative": "imperative", "potential": "potential",
-}
+# Verb tag mappings. The tense mapping lives inline in verb_form_key() below,
+# because mood tags (conditional/imperative/potential) coexist with the
+# indicative "present"/"perfect" tags in Wiktionary and must be checked first.
 VOICE_TAGS = {"active": "active", "passive": "passive"}
 POLARITY_TAGS = {"negative": "negative"}  # positive is default
 PERSON_TAGS = {
@@ -144,11 +141,12 @@ PERSON_TAGS = {
     ("third-person", "plural"): "3pl",
 }
 INFINITIVE_TAGS = {
-    "first-infinitive": "inf1_long",
-    "second-infinitive": "inf2",
-    "third-infinitive": "inf3",
-    "fourth-infinitive": "inf4",
-    "fifth-infinitive": "inf5",
+    # kaikki tags infinitives as "infinitive-i-long", "infinitive-ii", etc.
+    # In principle all five exist, but 2nd–5th infinitives are present on
+    # only a handful of entries in the raw dump (<10 verbs each), so we'd
+    # only be able to offer 2–6 drill challenges. We emit just inf1_long,
+    # which is covered for essentially every verb.
+    "infinitive-i-long": "inf1_long",
 }
 PARTICIPLE_TAGS = {"participle"}
 
@@ -176,13 +174,29 @@ def verb_form_key(tags: set[str]) -> str | None:
         tense = "past" if "past" in tags else "present"
         return f"participle_{tense}_{voice}"
 
-    tense = None
-    for t, key in TENSE_TAGS.items():
-        if t in tags:
-            tense = key
-            break
-    if tense is None:
+    # Mood must be checked BEFORE plain indicative tense. In Wiktionary's tag
+    # system a conditional-present form carries {"conditional","present",...},
+    # so a naive "is any tense tag present?" lookup finds "present" first and
+    # misclassifies the form as indicative. Moods also combine with "perfect"
+    # to form the perfect variants (e.g. "olisin ollut" → conditional_perfect).
+    tense: str | None
+    if "conditional" in tags:
+        tense = "conditional_perfect" if "perfect" in tags else "conditional"
+    elif "imperative" in tags:
+        tense = "imperative_perfect" if "perfect" in tags else "imperative"
+    elif "potential" in tags:
+        tense = "potential_perfect" if "perfect" in tags else "potential"
+    elif "pluperfect" in tags:
+        tense = "pluperfect"
+    elif "perfect" in tags:
+        tense = "perfect"
+    elif "past" in tags:
+        tense = "past"
+    elif "present" in tags:
+        tense = "present"
+    else:
         return None
+
     voice = "passive" if "passive" in tags else "active"
     polarity = "negative" if "negative" in tags else "positive"
 
@@ -191,8 +205,10 @@ def verb_form_key(tags: set[str]) -> str | None:
         if p1 in tags and p2 in tags:
             person = f"_{key}"
             break
-    if "imperative" in tags and not person:
-        return None  # ambiguous imperatives without person
+    # Active imperative requires a person (1sg "-" doesn't exist in Finnish);
+    # passive imperative is impersonal so no person is fine.
+    if tense.startswith("imperative") and voice == "active" and not person:
+        return None
     return f"{tense}_{voice}_{polarity}{person}"
 
 

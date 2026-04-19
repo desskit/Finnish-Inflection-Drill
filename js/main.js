@@ -512,11 +512,15 @@ function setMode(mode) {
     cancelTest();
   }
   state.mode = mode;
-  // Always return to the drill view; rebuild the pool only if the mode
-  // actually changed, so clicking "Nouns" while already in noun mode doesn't
-  // randomize the current challenge.
   setView("drill");
-  if (changed) rebuildPool();
+  // Rebuild the pool on a real mode switch, OR whenever there's no current
+  // challenge on screen. The second case matters on first boot: state.mode
+  // is initialized to "noun", so the final setMode("noun") in boot() looks
+  // like a no-op and would skip rebuildPool(), leaving the noun page blank
+  // until the user toggled to verbs and back. Preserving `!changed` with an
+  // existing challenge still keeps the original UX of not re-randomizing the
+  // prompt when you click the tab you're already on.
+  if (changed || !state.current) rebuildPool();
   else updateStatus();
 }
 

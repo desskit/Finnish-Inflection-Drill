@@ -12,10 +12,6 @@
     { "id": "potential",          "label": "potential" },
     { "id": "potential_perfect",  "label": "potential perfect" },
     { "id": "inf1_long",          "label": "1st long infinitive" },
-    { "id": "inf2",               "label": "2nd infinitive" },
-    { "id": "inf3",               "label": "3rd infinitive" },
-    { "id": "inf4",               "label": "4th infinitive" },
-    { "id": "inf5",               "label": "5th infinitive" },
     { "id": "participles",        "label": "participles" }
   ],
   "voices": [
