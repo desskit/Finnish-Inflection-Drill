@@ -17,3 +17,6 @@ Thumbs.db
 
 # Local config
 .env
+
+# Claude Code tooling metadata
+.claude/

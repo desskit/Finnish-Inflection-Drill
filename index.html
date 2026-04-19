@@ -3,14 +3,90 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1a1a1d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Finnish Drill" />
   <title>Finnish Drill</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <main id="app">
-    <h1>Finnish Drill</h1>
-    <p id="status">Loading config&hellip;</p>
+    <header class="app-header">
+      <h1>Finnish Drill</h1>
+      <div class="mode-switch" role="tablist">
+        <button id="mode-noun" class="mode-btn" role="tab" aria-selected="true">Nouns</button>
+        <button id="mode-verb" class="mode-btn" role="tab" aria-selected="false">Verbs</button>
+      </div>
+    </header>
+
+    <section id="challenge" class="panel challenge hidden">
+      <div class="word-line">
+        <span id="headword" class="headword">&mdash;</span>
+        <button id="speak-headword" type="button" class="speak-btn"
+                title="Hear the lemma" aria-label="Speak lemma">&#128266;</button>
+        <span id="translation" class="translation"></span>
+      </div>
+      <div id="target-form" class="target-form">&mdash;</div>
+      <ul id="examples" class="examples hidden"></ul>
+    </section>
+
+    <section id="answer-row" class="panel answer-row hidden">
+      <input id="answer" type="text" autocomplete="off" spellcheck="false"
+             autocapitalize="off" placeholder="type the form and press Enter" />
+      <div id="feedback" class="feedback"></div>
+      <div class="hint-row">
+        <button id="hint-letter" type="button" class="hint-btn" title="Reveal next letter (;)">
+          Next letter <kbd>;</kbd>
+        </button>
+        <button id="hint-answer" type="button" class="hint-btn" title="Show full answer (.)">
+          Show answer <kbd>.</kbd>
+        </button>
+        <button id="skip" type="button" class="hint-btn" title="Skip this word (-)">
+          Skip <kbd>-</kbd>
+        </button>
+        <button id="speak-answer" type="button" class="hint-btn" title="Hear the answer (')">
+          Speak <kbd>'</kbd>
+        </button>
+      </div>
+    </section>
+
+    <section id="filters-noun" class="panel filters hidden" aria-label="Noun filters"></section>
+    <section id="filters-verb" class="panel filters hidden" aria-label="Verb filters"></section>
+
+    <section class="panel" aria-label="Settings">
+      <div class="filter-section-head">
+        <h2>Settings</h2>
+      </div>
+      <label class="group-row">
+        <input id="setting-require-correct" type="checkbox" />
+        <span class="group-label">Require correct answer to advance</span>
+        <span class="group-example">wrong answers don't auto-reveal; keep trying</span>
+      </label>
+      <label class="group-row">
+        <input id="setting-autoplay" type="checkbox" />
+        <span class="group-label">Speak answer automatically</span>
+        <span class="group-example">play the correct form out loud when revealed</span>
+      </label>
+      <p id="tts-warning" class="tts-warning hidden">
+        No Finnish voice installed on this device &mdash; audio will be silent.
+      </p>
+    </section>
+
+    <details id="stats-panel" class="panel stats-panel">
+      <summary>
+        <span>Statistics</span>
+        <button id="stats-reset" type="button" class="mini-btn">Reset stats</button>
+      </summary>
+      <div id="stats-body"></div>
+    </details>
+
+    <section id="status-line" class="status-line">Loading&hellip;</section>
   </main>
+
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

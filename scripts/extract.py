@@ -47,8 +47,11 @@ CONFIG = ROOT / "config"
 KAIKKI_FILE = RAW / "kaikki_finnish.jsonl"
 FREQ_FILE = RAW / "frequency_fi.txt"
 
-# How many of the most common words to keep (per part of speech).
-FREQUENCY_CUTOFF = 10000
+# Keep a lemma if ANY of its inflected forms ranks within the top N of the
+# frequency list. Using inflected-form ranks rather than the lemma's own rank
+# lets us catch common verbs whose dictionary form is rarer than their
+# conjugations (e.g. "olla" is much rarer than "on", "oli", "olen").
+FREQUENCY_CUTOFF = 20000
 
 # -------- helpers --------------------------------------------------------
 
@@ -292,6 +295,15 @@ def main() -> int:
     nouns: list[dict] = []
     verbs: list[dict] = []
     counts = Counter()
+    unknown_templates: Counter[str] = Counter()
+
+    def raw_template_name(entry: dict) -> str | None:
+        for key in ("inflection_templates", "head_templates"):
+            for t in entry.get(key) or []:
+                name = t.get("name")
+                if name and (name.startswith("fi-decl-") or name.startswith("fi-conj-")):
+                    return name
+        return None
 
     for entry in iter_entries(KAIKKI_FILE):
         pos = entry.get("pos")
@@ -300,29 +312,46 @@ def main() -> int:
             continue
         counts[f"seen_{pos}"] += 1
 
+        # Skip inflected-form-pointer entries: kaikki.org lists every inflected
+        # form (e.g. "sanoi", "sanon") as its own entry with pos=verb but no
+        # inflection table — they just point back to the lemma. We only want
+        # lemma entries, which always carry an inflection_templates field.
+        if not entry.get("inflection_templates"):
+            counts[f"not_lemma_{pos}"] += 1
+            continue
+
+        # Take the best (lowest/smallest) rank across the lemma itself and all
+        # of its inflected forms. A lemma counts as "common enough" if any of
+        # its forms is in the top FREQUENCY_CUTOFF of the frequency list.
         rank = freq.get(word.lower())
+        for f in entry.get("forms") or []:
+            s = f.get("form")
+            if not s:
+                continue
+            r = freq.get(s.lower())
+            if r is not None and (rank is None or r < rank):
+                rank = r
         if freq and (rank is None or rank > FREQUENCY_CUTOFF):
             continue
         counts[f"in_freq_{pos}"] += 1
 
-        if pos == "noun":
-            ktype = extract_kotus_type(entry, noun_tpl)
-            group = noun_group_of.get(ktype, "other")
-            shaped = shape_noun(entry, ktype, group)
-            if not shaped["inflections"]:
-                continue
-            shaped["frequency_rank"] = rank
-            nouns.append(shaped)
-        else:
-            ktype = extract_kotus_type(entry, verb_tpl)
-            group = verb_group_of.get(ktype)
-            if not group:
-                continue  # skip verbs we can't categorize
-            shaped = shape_verb(entry, ktype, group)
-            if not shaped["inflections"]:
-                continue
-            shaped["frequency_rank"] = rank
-            verbs.append(shaped)
+        tpl_map = noun_tpl if pos == "noun" else verb_tpl
+        group_of = noun_group_of if pos == "noun" else verb_group_of
+        shaper = shape_noun if pos == "noun" else shape_verb
+
+        ktype = extract_kotus_type(entry, tpl_map)
+        if ktype is None:
+            tname = raw_template_name(entry)
+            if tname:
+                unknown_templates[tname] += 1
+
+        group = group_of.get(ktype, "other")
+        shaped = shaper(entry, ktype, group)
+        if not shaped["inflections"]:
+            counts[f"no_inflections_{pos}"] += 1
+            continue
+        shaped["frequency_rank"] = rank
+        (nouns if pos == "noun" else verbs).append(shaped)
 
     # Deduplicate by word (keep the one with most inflection entries).
     def dedupe(items: list[dict]) -> list[dict]:
@@ -354,6 +383,22 @@ def main() -> int:
 
     print("Done.")
     print("Counts:", dict(counts))
+
+    # Sanity check: show inflection key counts for a handful of common lemmas.
+    sample_nouns = {"kala", "talo", "nainen", "k\u00e4si", "vastaus"}
+    sample_verbs = {"sanoa", "olla", "tehd\u00e4", "menn\u00e4", "puhua"}
+    print("\nSanity check — inflection keys extracted for sample lemmas:")
+    for n in nouns:
+        if n["word"] in sample_nouns:
+            print(f"  noun {n['word']!r:12s} group={n['group']:12s} type={n['kotus_type']}  {len(n['inflections'])} keys")
+    for v in verbs:
+        if v["word"] in sample_verbs:
+            some_keys = list(v["inflections"].keys())[:3]
+            print(f"  verb {v['word']!r:12s} group={v['group']:12s} type={v['kotus_type']}  {len(v['inflections'])} keys, e.g. {some_keys}")
+    if unknown_templates:
+        print("\nUnknown templates (top 20) — add to scripts/kotus_templates.json if you want these covered:")
+        for name, n in unknown_templates.most_common(20):
+            print(f"  {n:5,}  {name}")
     return 0
 
 

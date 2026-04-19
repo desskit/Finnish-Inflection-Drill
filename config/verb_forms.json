@@ -27,11 +27,11 @@
     { "id": "negative", "label": "negative" }
   ],
   "persons": [
-    { "id": "1sg", "label": "1sg (min\u00e4)"  },
-    { "id": "2sg", "label": "2sg (sin\u00e4)"  },
-    { "id": "3sg", "label": "3sg (h\u00e4n)"   },
-    { "id": "1pl", "label": "1pl (me)"        },
-    { "id": "2pl", "label": "2pl (te)"        },
-    { "id": "3pl", "label": "3pl (he)"        }
+    { "id": "1sg", "label": "1st person singular" },
+    { "id": "2sg", "label": "2nd person singular" },
+    { "id": "3sg", "label": "3rd person singular" },
+    { "id": "1pl", "label": "1st person plural"   },
+    { "id": "2pl", "label": "2nd person plural"   },
+    { "id": "3pl", "label": "3rd person plural"   }
   ]
 }
