@@ -483,7 +483,13 @@ function testActive() {
 }
 
 // ---------- drill flow ----------
-function newChallenge() {
+// `opts.suppressFocus` skips the answer-input focus step at the end. Callers
+// triggered by user edits to the filter grid / presets / etc. pass true:
+// focusing the answer input from there scrolls the page up on mobile and
+// yanks focus out of the checkbox the user was just tapping. Explicit user
+// actions (submit, skip, mode switch) leave it unset so focus lands where
+// they expect.
+function newChallenge(opts) {
   cancelSpeech();
   const priority = (state.settings && state.settings.priorityMode) || "uniform";
   const capPreset = CAP_PRESETS[state.settings && state.settings.srsCap] || CAP_PRESETS.balanced;
@@ -507,8 +513,11 @@ function newChallenge() {
   }
   render();
   // Keep focus management scoped to the drill view — don't yank focus into
-  // a hidden answer input while the user is interacting with Options.
-  if (state.view === "drill") el.answer.focus();
+  // a hidden answer input while the user is interacting with Options — and
+  // skip it entirely when the caller asked us to (filter toggles, preset
+  // applies) so we don't scroll mobile users away from the control they're
+  // touching.
+  if (state.view === "drill" && !(opts && opts.suppressFocus)) el.answer.focus();
 }
 
 function submit() {
@@ -611,7 +620,8 @@ function skipChallenge() {
 }
 
 // ---------- mode + filters ----------
-function rebuildPool() {
+// `opts.suppressFocus` is forwarded to newChallenge — see the note there.
+function rebuildPool(opts) {
   let pool = state.mode === "noun"
     ? buildNounPool(state.data, state.nounFilters)
     : buildVerbPool(state.data, state.verbFilters);
@@ -639,7 +649,7 @@ function rebuildPool() {
 
   state.pool = pool;
   updateStatus();
-  newChallenge();
+  newChallenge(opts);
 }
 
 // Reflect current tab selection on the four buttons.
@@ -766,17 +776,20 @@ function applyPreset(name) {
     saveNounFilters(state.nounFilters);
     renderNounFilters(el.filtersNoun, state.cfg, state.nounFilters, (newState) => {
       saveNounFilters(newState);
-      rebuildPool();
+      rebuildPool({ suppressFocus: true });
     });
   } else {
     state.verbFilters = snap;
     saveVerbFilters(state.verbFilters);
     renderVerbFilters(el.filtersVerb, state.cfg, state.verbFilters, (newState) => {
       saveVerbFilters(newState);
-      rebuildPool();
+      rebuildPool({ suppressFocus: true });
     });
   }
-  rebuildPool();
+  // Applying a preset is a deliberate click, but it's the preset row the user
+  // touched — not the answer input. Respect that on mobile so we don't scroll
+  // them away from the presets list.
+  rebuildPool({ suppressFocus: true });
 }
 
 function saveCurrentAsPreset() {
@@ -832,11 +845,11 @@ async function boot() {
 
     renderNounFilters(el.filtersNoun, cfg, state.nounFilters, (newState) => {
       saveNounFilters(newState);
-      if (state.mode === "noun") rebuildPool();
+      if (state.mode === "noun") rebuildPool({ suppressFocus: true });
     });
     renderVerbFilters(el.filtersVerb, cfg, state.verbFilters, (newState) => {
       saveVerbFilters(newState);
-      if (state.mode === "verb") rebuildPool();
+      if (state.mode === "verb") rebuildPool({ suppressFocus: true });
     });
 
     // Settings
