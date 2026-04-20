@@ -19,7 +19,14 @@ export function nounLabel(key, cfg) {
   const n = byId(cfg.nounCases.numbers, numberId);
   const caseLabel = c ? c.label : caseId;
   const numberLabel = n ? n.label.toLowerCase() : numberId;
-  return `${caseLabel} ${numberLabel}`;
+  // Tack the ending hint onto the prompt (e.g. "ablative plural (-ltA)") so
+  // the user has a reminder of what the target suffix looks like without
+  // needing to cross-reference the filter grid. The nominative has no
+  // ending, so we skip the parenthetical there. Empty-string hints are also
+  // skipped for forward-compat with future cases whose shape doesn't map
+  // cleanly to a single suffix.
+  const hint = c && c.ending_hint ? ` (${c.ending_hint})` : "";
+  return `${caseLabel} ${numberLabel}${hint}`;
 }
 
 export function verbLabel(key, cfg) {

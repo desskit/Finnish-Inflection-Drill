@@ -9,6 +9,10 @@ import {
   loadNounFilters, saveNounFilters, renderNounFilters,
   loadVerbFilters, saveVerbFilters, renderVerbFilters,
 } from "./filters.js";
+import {
+  loadPresets, savePresets, listNames,
+  upsertPreset, deletePreset, getPreset,
+} from "./presets.js";
 import { loadSettings, saveSettings } from "./settings.js";
 import { loadStats, saveStats, resetStats, recordOutcome } from "./stats.js";
 import { renderStats } from "./stats_ui.js";
@@ -37,6 +41,7 @@ const state = {
   settings: null,
   stats: null,
   schedule: null,           // FSRS-lite schedule, { byItem: { id → entry } }
+  presets: null,            // { noun: { name → filters }, verb: { ... } }
   streak: null,
   // Test mode: null when idle, otherwise { length, answered, results: [] }.
   // When `finished` is true, the results panel is on screen and new submits
@@ -75,6 +80,9 @@ const el = {
   skip:            document.getElementById("skip"),
   filtersNoun:     document.getElementById("filters-noun"),
   filtersVerb:     document.getElementById("filters-verb"),
+  presetsPanel:    document.getElementById("presets-panel"),
+  presetSave:      document.getElementById("preset-save"),
+  presetList:      document.getElementById("preset-list"),
   statusLine:      document.getElementById("status-line"),
   settingRequire:  document.getElementById("setting-require-correct"),
   statsPanel:      document.getElementById("stats-panel"),
@@ -657,6 +665,10 @@ function setView(view) {
   el.answerRow.classList.toggle("hidden", !(drill && state.current));
   el.filtersNoun.classList.toggle("hidden", !(drill && state.mode === "noun"));
   el.filtersVerb.classList.toggle("hidden", !(drill && state.mode === "verb"));
+  // Presets live between filters and test mode; drill-only, and the list is
+  // per-mode so it re-renders on any mode switch that reaches this code path.
+  el.presetsPanel.classList.toggle("hidden", !drill);
+  if (drill) renderPresets();
   // Test mode / stats / status line are drill-only; settings now live in Options.
   el.testPanel.classList.toggle("hidden",     !drill);
   el.statsPanel.classList.toggle("hidden",    !drill);
@@ -688,6 +700,108 @@ function setMode(mode) {
   else updateStatus();
 }
 
+// ---------- presets ----------
+// Save / apply / delete named filter configurations, scoped to the current
+// mode. Presets capture only the filter state — they deliberately don't
+// touch app-wide settings (theme, priority mode, etc.), which live under
+// Options and should stay stable across presets.
+
+function currentFilters() {
+  return state.mode === "noun" ? state.nounFilters : state.verbFilters;
+}
+
+// Re-render the list for whichever mode is currently active. Cheap enough
+// (DOM rebuild, not diff) that we just nuke and rebuild on every change.
+function renderPresets() {
+  if (!el.presetList) return;
+  el.presetList.innerHTML = "";
+  const names = listNames(state.presets, state.mode);
+  if (names.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "preset-empty";
+    empty.textContent = "No saved presets yet. Configure filters above and click Save.";
+    el.presetList.appendChild(empty);
+    return;
+  }
+  for (const name of names) {
+    el.presetList.appendChild(buildPresetRow(name));
+  }
+}
+
+function buildPresetRow(name) {
+  const li = document.createElement("li");
+  li.className = "preset-row";
+
+  const apply = document.createElement("button");
+  apply.type = "button";
+  apply.className = "preset-apply";
+  apply.textContent = name;
+  apply.title = `Apply preset "${name}"`;
+  apply.addEventListener("click", () => applyPreset(name));
+  li.appendChild(apply);
+
+  const del = document.createElement("button");
+  del.type = "button";
+  del.className = "preset-delete";
+  del.title = `Delete preset "${name}"`;
+  del.setAttribute("aria-label", `Delete preset ${name}`);
+  del.textContent = "\u2715"; // ✕
+  del.addEventListener("click", (e) => {
+    e.stopPropagation();
+    removePreset(name);
+  });
+  li.appendChild(del);
+
+  return li;
+}
+
+function applyPreset(name) {
+  const snap = getPreset(state.presets, state.mode, name);
+  if (!snap) return;
+  // Replace filter state wholesale and persist, then re-render the filter
+  // panel so the checkboxes reflect the new values. rebuildPool() picks up
+  // the change and surfaces a fresh challenge.
+  if (state.mode === "noun") {
+    state.nounFilters = snap;
+    saveNounFilters(state.nounFilters);
+    renderNounFilters(el.filtersNoun, state.cfg, state.nounFilters, (newState) => {
+      saveNounFilters(newState);
+      rebuildPool();
+    });
+  } else {
+    state.verbFilters = snap;
+    saveVerbFilters(state.verbFilters);
+    renderVerbFilters(el.filtersVerb, state.cfg, state.verbFilters, (newState) => {
+      saveVerbFilters(newState);
+      rebuildPool();
+    });
+  }
+  rebuildPool();
+}
+
+function saveCurrentAsPreset() {
+  // Prompt for a name. If the name is already taken, confirm before
+  // overwriting — otherwise a typo could silently clobber a good preset.
+  const raw = window.prompt("Save current filters as preset. Name:");
+  if (raw === null) return; // user cancelled
+  const name = raw.trim();
+  if (!name) return;
+  const existing = listNames(state.presets, state.mode);
+  if (existing.includes(name)) {
+    if (!confirm(`Preset "${name}" already exists. Overwrite it?`)) return;
+  }
+  upsertPreset(state.presets, state.mode, name, currentFilters());
+  savePresets(state.presets);
+  renderPresets();
+}
+
+function removePreset(name) {
+  if (!confirm(`Delete preset "${name}"?`)) return;
+  deletePreset(state.presets, state.mode, name);
+  savePresets(state.presets);
+  renderPresets();
+}
+
 // ---------- boot ----------
 async function boot() {
   try {
@@ -704,6 +818,7 @@ async function boot() {
     state.settings    = loadSettings();
     state.stats       = loadStats();
     state.schedule    = loadSchedule();
+    state.presets     = loadPresets();
     state.streak      = checkStreakExpired(loadStreak());
     saveStreak(state.streak); // persist any expiry reset immediately
     renderStreak();
@@ -840,6 +955,11 @@ async function boot() {
       }
     });
 
+    // Presets — save button + list. The list re-renders whenever the mode
+    // changes (via setMode → setView path), since it's scoped per mode.
+    el.presetSave.addEventListener("click", () => saveCurrentAsPreset());
+    renderPresets();
+
     el.modeNoun.addEventListener("click",    () => setMode("noun"));
     el.modeVerb.addEventListener("click",    () => setMode("verb"));
     el.modeOptions.addEventListener("click", () => setView("options"));
@@ -902,6 +1022,7 @@ function exportStats() {
     settings: state.settings,
     streak: state.streak,
     schedule: state.schedule,
+    presets: state.presets,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -956,6 +1077,14 @@ async function importStats(file) {
     if (data.schedule && data.schedule.byItem) {
       state.schedule = { byItem: data.schedule.byItem };
       saveSchedule(state.schedule);
+    }
+    if (data.presets && (data.presets.noun || data.presets.verb)) {
+      state.presets = {
+        noun: data.presets.noun || {},
+        verb: data.presets.verb || {},
+      };
+      savePresets(state.presets);
+      renderPresets();
     }
     if (data.streak) {
       state.streak = checkStreakExpired({ ...state.streak, ...data.streak });

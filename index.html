@@ -91,6 +91,19 @@
     <section id="filters-noun" class="panel filters hidden" aria-label="Noun filters"></section>
     <section id="filters-verb" class="panel filters hidden" aria-label="Verb filters"></section>
 
+    <section id="presets-panel" class="panel presets-panel hidden" aria-label="Filter presets">
+      <div class="filter-section-head">
+        <h2>Presets</h2>
+        <button id="preset-save" type="button" class="mini-btn">Save current&hellip;</button>
+      </div>
+      <p class="panel-description">
+        Save the current filter selection under a name, then jump back to it
+        any time. Presets are per mode &mdash; noun presets and verb presets
+        are kept separate.
+      </p>
+      <ul id="preset-list" class="preset-list"></ul>
+    </section>
+
     <section id="about" class="panel about hidden" aria-label="About">
       <h2>About</h2>
       <p>
@@ -126,6 +139,15 @@
           verb type (1&ndash;6).
         </li>
       </ul>
+
+      <h3>Filter presets</h3>
+      <p>
+        Once you've dialed in a filter selection you like, click
+        <strong>Save current&hellip;</strong> under <em>Presets</em> (between
+        the filter grid and Test mode) and give it a name. Saved presets are
+        per mode &mdash; noun and verb presets are kept separate &mdash; and
+        clicking one applies it instantly. Reuse the same name to overwrite.
+      </p>
 
       <h3>Test mode</h3>
       <p>

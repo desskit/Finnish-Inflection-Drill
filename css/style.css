@@ -451,6 +451,61 @@ kbd {
 .group-label   { color: var(--text); }
 .group-example { color: var(--muted); font-size: 0.85em; font-style: italic; }
 
+/* Presets panel: list of saved filter configurations, per mode. Each row
+ * has a name button (click = apply) and a small trash button on the right.
+ * The whole row is a button, so the layout hugs tightly to the edges. */
+.preset-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.preset-empty {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-style: italic;
+  padding: 0.3rem 0.1rem;
+}
+.preset-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+}
+.preset-apply {
+  flex: 1;
+  text-align: left;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.7rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.preset-apply:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+.preset-delete {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 0.6rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.preset-delete:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
 /* Variant for rows whose control isn't a simple checkbox+label (e.g. the
  * priority-mode radiogroup with its explanatory footer). Stacks vertically
  * and drops the row-level hover/pointer so it doesn't look clickable as a
