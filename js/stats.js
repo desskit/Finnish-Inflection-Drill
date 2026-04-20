@@ -131,3 +131,79 @@ export function summarize(bucketMap) {
   });
   return rows;
 }
+
+/**
+ * Aggregate `byItem` into per-word rows for the given mode. One row per lemma,
+ * with totals rolled up across every form you've attempted for that word plus
+ * a pointer to your weakest form (lowest accuracy among attempted forms,
+ * ties broken by wrong count).
+ *
+ * Returns (unsorted — caller sorts):
+ *   [{ word, attempts, correct, wrong, shown, skipped, accuracy,
+ *      formsAttempted, worstKey, worstAccuracy }]
+ */
+export function summarizeByWord(stats, mode) {
+  const prefix = `${mode}|`;
+  // Map<word, { correct, wrong, shown, skipped, forms: Map<key, bucket> }>
+  const byWord = new Map();
+
+  for (const id of Object.keys(stats.byItem || {})) {
+    if (!id.startsWith(prefix)) continue;
+    // IDs look like "<mode>|<word>|<key>". The key itself can contain "_" but
+    // never "|", so one split after the mode prefix is safe.
+    const rest = id.slice(prefix.length);
+    const sep = rest.indexOf("|");
+    if (sep < 0) continue;
+    const word = rest.slice(0, sep);
+    const key = rest.slice(sep + 1);
+    const b = stats.byItem[id];
+
+    let row = byWord.get(word);
+    if (!row) {
+      row = { correct: 0, wrong: 0, shown: 0, skipped: 0, forms: new Map() };
+      byWord.set(word, row);
+    }
+    row.correct += b.correct;
+    row.wrong   += b.wrong;
+    row.shown   += b.shown;
+    row.skipped += b.skipped;
+    row.forms.set(key, b);
+  }
+
+  const rows = [];
+  for (const [word, row] of byWord) {
+    const attempts = row.correct + row.wrong;
+    const acc = attempts === 0 ? null : row.correct / attempts;
+
+    let worstKey = null, worstAccuracy = null, worstWrong = -1;
+    for (const [k, b] of row.forms) {
+      const a = b.correct + b.wrong;
+      if (a === 0) continue;
+      const ac = b.correct / a;
+      // Prefer lowest accuracy; on tie prefer the one with more wrong attempts.
+      if (
+        worstKey === null ||
+        ac < worstAccuracy ||
+        (ac === worstAccuracy && b.wrong > worstWrong)
+      ) {
+        worstKey = k;
+        worstAccuracy = ac;
+        worstWrong = b.wrong;
+      }
+    }
+
+    rows.push({
+      word,
+      attempts,
+      correct: row.correct,
+      wrong:   row.wrong,
+      shown:   row.shown,
+      skipped: row.skipped,
+      accuracy: acc,
+      formsAttempted: row.forms.size,
+      worstKey,
+      worstAccuracy,
+    });
+  }
+  return rows;
+}

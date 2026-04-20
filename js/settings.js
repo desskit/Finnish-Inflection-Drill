@@ -16,6 +16,7 @@ export function defaultSettings() {
     frequencyCap:      0,     // 0 = no cap, otherwise only include words whose
                               // best rank is <= this value. Matches the cutoff
                               // used by scripts/extract.py at build time.
+    theme:             "system", // "system" | "light" | "dark"
   };
 }
 

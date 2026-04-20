@@ -11,6 +11,24 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <!-- Apply the persisted theme before CSS paints, so we never flash the
+       wrong background on boot. Mirrors js/theme.js logic but must be
+       self-contained (CSS hasn't loaded yet). -->
+  <script>
+    (function () {
+      try {
+        var raw = localStorage.getItem("settings_v1");
+        var pref = raw ? (JSON.parse(raw).theme || "system") : "system";
+        var effective = pref;
+        if (pref === "system") {
+          effective = (window.matchMedia
+            && window.matchMedia("(prefers-color-scheme: light)").matches)
+            ? "light" : "dark";
+        }
+        document.documentElement.setAttribute("data-theme", effective);
+      } catch (e) { /* fall through to default dark */ }
+    })();
+  </script>
   <link rel="stylesheet" href="css/style.css" />
 
   <!-- Google tag (gtag.js) -->
@@ -26,7 +44,11 @@
 <body>
   <main id="app">
     <header class="app-header">
-      <h1>Finnish Inflection Drill <small id="app-version" class="version"></small></h1>
+      <h1>
+        Finnish Inflection Drill
+        <small id="app-version" class="version"></small>
+        <span id="streak-badge" class="streak-badge hidden" title="Daily streak"></span>
+      </h1>
       <div class="mode-switch" role="tablist">
         <button id="mode-noun"    class="mode-btn" role="tab" aria-selected="true">Nouns</button>
         <button id="mode-verb"    class="mode-btn" role="tab" aria-selected="false">Verbs</button>
@@ -112,41 +134,64 @@
         review list of anything you missed. Statistics still update normally.
       </p>
 
-      <h3>Settings</h3>
+      <h3>Options</h3>
+      <p>
+        Everything configurable lives under the Options tab, grouped into
+        Appearance, Drill behavior, Feedback, and Data.
+      </p>
       <ul>
+        <li>
+          <strong>Theme</strong> &mdash; System (follows your OS), Light, or
+          Dark. Persists across sessions.
+        </li>
         <li>
           <strong>Require correct answer to advance</strong> &mdash; wrong
           answers don't auto-reveal; keep trying until you get it.
         </li>
         <li>
-          <strong>Speak answer automatically</strong> &mdash; play the correct
-          form aloud when it's revealed.
+          <strong>Focus on forms you miss</strong> &mdash; biases the random
+          picker toward forms (and, to a smaller degree, words) you tend to
+          get wrong. Everything still shows up; weak spots just show up more.
         </li>
         <li>
           <strong>Hide answers longer than N characters</strong> &mdash; skips
           awkwardly long forms (partitive plurals, compounds, etc.).
         </li>
         <li>
-          <strong>Focus on forms you miss</strong> &mdash; biases the random
-          picker toward forms (and, to a smaller degree, words) you tend to get
-          wrong. Everything still shows up; weak spots just show up more.
+          <strong>Limit pool to most-common words</strong> &mdash; restricts
+          drills to the top N most common Finnish words by frequency rank.
+          Helpful early on; turn it off once the basics feel solid.
+        </li>
+        <li>
+          <strong>Speak answer automatically</strong> &mdash; play the correct
+          form aloud when it's revealed.
         </li>
         <li>
           <strong>Vibrate on wrong answer</strong> &mdash; short haptic buzz on
           mobile devices that support it.
         </li>
         <li>
-          <strong>Limit pool to most-common words</strong> &mdash; restricts
-          drills to the top N most common Finnish words by frequency rank.
-          Helpful early on; turn it off once the basics feel solid.
+          <strong>Export / Import stats</strong> &mdash; back up or restore
+          your drill statistics, settings, and streak as a JSON file.
         </li>
       </ul>
 
-      <h3>Options</h3>
+      <h3>Daily streak</h3>
       <p>
-        Export your stats to a JSON file to back them up, or import a previous
-        export to restore them. Stats live in your browser's local storage, so
-        they don't follow you across devices unless you move them manually.
+        The small flame badge in the title counts consecutive days you've
+        answered at least one drill correctly. Miss a day and it resets to
+        zero, but your best run is kept so you can see your record.
+      </p>
+
+      <h3>Statistics</h3>
+      <p>
+        Expand the <strong>Statistics</strong> section at the bottom of the
+        drill view for a breakdown of your accuracy. Alongside per-case,
+        per-tense, and per-type tables there's a <strong>Per word</strong>
+        view: one row per lemma, rolling up everything you've attempted for
+        that word, with a pointer to your weakest form. Sort by most wrong,
+        most attempts, accuracy, or alphabetically, and filter by substring
+        to find a specific word.
       </p>
 
       <h3>Hints &amp; shortcuts</h3>
@@ -162,7 +207,7 @@
       <p>
         Audio uses your device's built-in text-to-speech. Most desktops and
         phones have a Finnish voice installed. If yours doesn't, you'll see a
-        warning in Settings and the audio buttons are disabled.
+        warning in Options and the audio buttons are disabled.
       </p>
 
       <h3>Offline &amp; install</h3>
@@ -193,71 +238,89 @@
       <p class="about-version">Version <span id="about-version"></span></p>
     </section>
 
-    <section id="settings-panel" class="panel" aria-label="Settings">
-      <div class="filter-section-head">
-        <h2>Settings</h2>
-      </div>
-      <label class="group-row">
-        <input id="setting-require-correct" type="checkbox" />
-        <span class="group-label">Require correct answer to advance</span>
-        <span class="group-example">wrong answers don't auto-reveal; keep trying</span>
-      </label>
-      <label class="group-row">
-        <input id="setting-autoplay" type="checkbox" />
-        <span class="group-label">Speak answer automatically</span>
-        <span class="group-example">play the correct form out loud when revealed</span>
-      </label>
-      <label class="group-row">
-        <input id="setting-exclude-long" type="checkbox" />
-        <span class="group-label">
-          Hide answers longer than
-          <input id="setting-max-length" type="number" min="5" max="40"
-                 class="inline-number" />
-          characters
-        </span>
-        <span class="group-example">skips awkward partitive-plural, compound, etc.</span>
-      </label>
-      <label class="group-row">
-        <input id="setting-weighted" type="checkbox" />
-        <span class="group-label">Focus on forms you miss</span>
-        <span class="group-example">weight sampling toward forms and words you get wrong more often</span>
-      </label>
-      <label class="group-row">
-        <input id="setting-haptic" type="checkbox" />
-        <span class="group-label">Vibrate on wrong answer</span>
-        <span class="group-example">short haptic buzz on mobile (ignored if unsupported)</span>
-      </label>
-      <label class="group-row">
-        <span class="group-label">
-          Limit pool to most-common words:
-          <select id="setting-frequency-cap" class="inline-select">
-            <option value="0">All words</option>
-            <option value="1000">Top 1,000</option>
-            <option value="2500">Top 2,500</option>
-            <option value="5000">Top 5,000</option>
-            <option value="10000">Top 10,000</option>
-          </select>
-        </span>
-        <span class="group-example">drops rarer words entirely &mdash; useful for early study</span>
-      </label>
-      <p id="tts-warning" class="tts-warning hidden">
-        No Finnish voice installed on this device &mdash; audio will be silent.
-      </p>
-    </section>
-
     <section id="options-panel" class="panel hidden" aria-label="Options">
       <h2>Options</h2>
-      <p class="panel-description">
-        Back up or restore your drill statistics. Stats are stored in your
-        browser and are lost if you clear site data or switch devices &mdash;
-        export occasionally if your streak matters to you.
-      </p>
-      <div class="options-row">
-        <button id="export-stats" type="button" class="mode-btn">Export stats</button>
-        <button id="import-stats-btn" type="button" class="mini-btn">Import stats&hellip;</button>
-        <input id="import-stats-file" type="file" accept="application/json" class="hidden" />
-      </div>
-      <p id="import-feedback" class="import-feedback"></p>
+
+      <section class="options-group">
+        <h3>Appearance</h3>
+        <div class="options-row">
+          <span class="group-label">Theme</span>
+          <div id="theme-switch" class="seg-switch" role="radiogroup" aria-label="Theme">
+            <button type="button" class="seg-btn" data-value="system" role="radio">System</button>
+            <button type="button" class="seg-btn" data-value="light"  role="radio">Light</button>
+            <button type="button" class="seg-btn" data-value="dark"   role="radio">Dark</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="options-group">
+        <h3>Drill behavior</h3>
+        <label class="group-row">
+          <input id="setting-require-correct" type="checkbox" />
+          <span class="group-label">Require correct answer to advance</span>
+          <span class="group-example">wrong answers don't auto-reveal; keep trying</span>
+        </label>
+        <label class="group-row">
+          <input id="setting-weighted" type="checkbox" />
+          <span class="group-label">Focus on forms you miss</span>
+          <span class="group-example">weight sampling toward forms and words you get wrong more often</span>
+        </label>
+        <label class="group-row">
+          <input id="setting-exclude-long" type="checkbox" />
+          <span class="group-label">
+            Hide answers longer than
+            <input id="setting-max-length" type="number" min="5" max="40"
+                   class="inline-number" />
+            characters
+          </span>
+          <span class="group-example">skips awkward partitive-plural, compound, etc.</span>
+        </label>
+        <label class="group-row">
+          <span class="group-label">
+            Limit pool to most-common words:
+            <select id="setting-frequency-cap" class="inline-select">
+              <option value="0">All words</option>
+              <option value="1000">Top 1,000</option>
+              <option value="2500">Top 2,500</option>
+              <option value="5000">Top 5,000</option>
+              <option value="10000">Top 10,000</option>
+            </select>
+          </span>
+          <span class="group-example">drops rarer words entirely &mdash; useful for early study</span>
+        </label>
+      </section>
+
+      <section class="options-group">
+        <h3>Feedback</h3>
+        <label class="group-row">
+          <input id="setting-autoplay" type="checkbox" />
+          <span class="group-label">Speak answer automatically</span>
+          <span class="group-example">play the correct form out loud when revealed</span>
+        </label>
+        <label class="group-row">
+          <input id="setting-haptic" type="checkbox" />
+          <span class="group-label">Vibrate on wrong answer</span>
+          <span class="group-example">short haptic buzz on mobile (ignored if unsupported)</span>
+        </label>
+        <p id="tts-warning" class="tts-warning hidden">
+          No Finnish voice installed on this device &mdash; audio will be silent.
+        </p>
+      </section>
+
+      <section class="options-group">
+        <h3>Data</h3>
+        <p class="panel-description">
+          Back up or restore your drill statistics and settings. Stats live in
+          your browser's local storage &mdash; export occasionally if your
+          streak matters to you.
+        </p>
+        <div class="options-row">
+          <button id="export-stats" type="button" class="mode-btn">Export stats</button>
+          <button id="import-stats-btn" type="button" class="mini-btn">Import stats&hellip;</button>
+          <input id="import-stats-file" type="file" accept="application/json" class="hidden" />
+        </div>
+        <p id="import-feedback" class="import-feedback"></p>
+      </section>
     </section>
 
     <section id="test-panel" class="panel" aria-label="Test mode">

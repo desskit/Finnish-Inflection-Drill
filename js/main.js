@@ -13,6 +13,8 @@ import { loadSettings, saveSettings } from "./settings.js";
 import { loadStats, saveStats, resetStats, recordOutcome } from "./stats.js";
 import { renderStats } from "./stats_ui.js";
 import { speak, ttsAvailable, cancelSpeech } from "./tts.js";
+import { applyTheme, watchSystemTheme } from "./theme.js";
+import { loadStreak, saveStreak, recordCorrect as bumpStreak, checkExpired as checkStreakExpired } from "./streak.js";
 import { APP_VERSION } from "./version.js";
 
 // ---------- state ----------
@@ -30,6 +32,7 @@ const state = {
   verbFilters: null,
   settings: null,
   stats: null,
+  streak: null,
   // Test mode: null when idle, otherwise { length, answered, results: [] }.
   // When `finished` is true, the results panel is on screen and new submits
   // don't affect the test.
@@ -73,9 +76,10 @@ const el = {
   speakAnswer:     document.getElementById("speak-answer"),
   examples:        document.getElementById("examples"),
   ttsWarning:      document.getElementById("tts-warning"),
-  settingsPanel:   document.getElementById("settings-panel"),
   settingExcludeLong: document.getElementById("setting-exclude-long"),
   settingMaxLength:   document.getElementById("setting-max-length"),
+  themeSwitch:     document.getElementById("theme-switch"),
+  streakBadge:     document.getElementById("streak-badge"),
   appVersion:      document.getElementById("app-version"),
   aboutVersion:    document.getElementById("about-version"),
   testPanel:       document.getElementById("test-panel"),
@@ -224,7 +228,44 @@ function score(outcome) {
   recordOutcome(state.stats, state.mode, state.current, outcome);
   saveStats(state.stats);
   state.scoredThisChallenge = true;
+  if (outcome === "correct") {
+    const before = state.streak.current;
+    bumpStreak(state.streak);
+    if (state.streak.current !== before) {
+      saveStreak(state.streak);
+      renderStreak();
+    }
+  }
   refreshStatsPanel();
+}
+
+// The little flame badge next to the version tag. Hidden when no streak.
+// Reflect the active theme on the segmented control.
+function renderThemeSwitch() {
+  if (!el.themeSwitch) return;
+  const pref = state.settings.theme;
+  for (const btn of el.themeSwitch.querySelectorAll(".seg-btn")) {
+    const active = btn.dataset.value === pref;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-checked", active ? "true" : "false");
+  }
+}
+
+function renderStreak() {
+  if (!el.streakBadge) return;
+  const n = state.streak && state.streak.current;
+  if (!n) {
+    el.streakBadge.classList.add("hidden");
+    el.streakBadge.textContent = "";
+    return;
+  }
+  el.streakBadge.classList.remove("hidden");
+  el.streakBadge.textContent = `\uD83D\uDD25 ${n}`;
+  el.streakBadge.setAttribute(
+    "title",
+    `Daily streak: ${n} day${n === 1 ? "" : "s"}` +
+    (state.streak.longest > n ? ` (best: ${state.streak.longest})` : "")
+  );
 }
 
 function refreshStatsPanel() {
@@ -528,8 +569,7 @@ function setView(view) {
   el.answerRow.classList.toggle("hidden", !(drill && state.current));
   el.filtersNoun.classList.toggle("hidden", !(drill && state.mode === "noun"));
   el.filtersVerb.classList.toggle("hidden", !(drill && state.mode === "verb"));
-  // Settings / test / stats / status line are only for the drill workflow.
-  el.settingsPanel.classList.toggle("hidden", !drill);
+  // Test mode / stats / status line are drill-only; settings now live in Options.
   el.testPanel.classList.toggle("hidden",     !drill);
   el.statsPanel.classList.toggle("hidden",    !drill);
   el.statusLine.classList.toggle("hidden",    !drill);
@@ -575,6 +615,16 @@ async function boot() {
     state.verbFilters = loadVerbFilters(cfg);
     state.settings    = loadSettings();
     state.stats       = loadStats();
+    state.streak      = checkStreakExpired(loadStreak());
+    saveStreak(state.streak); // persist any expiry reset immediately
+    renderStreak();
+
+    // Theme: the inline script in <head> already applied the persisted value
+    // pre-paint. Here we just sync the segmented control and subscribe to OS
+    // changes for the "system" case.
+    applyTheme(state.settings.theme);
+    renderThemeSwitch();
+    watchSystemTheme(() => state.settings.theme);
 
     renderNounFilters(el.filtersNoun, cfg, state.nounFilters, (newState) => {
       saveNounFilters(newState);
@@ -684,6 +734,18 @@ async function boot() {
     el.modeOptions.addEventListener("click", () => setView("options"));
     el.modeAbout.addEventListener("click",   () => setView("about"));
 
+    // Theme segmented control
+    el.themeSwitch.addEventListener("click", (e) => {
+      const btn = e.target.closest(".seg-btn");
+      if (!btn) return;
+      const value = btn.dataset.value;
+      if (!value || value === state.settings.theme) return;
+      state.settings.theme = value;
+      saveSettings(state.settings);
+      applyTheme(value);
+      renderThemeSwitch();
+    });
+
     // Stats export / import — JSON files you can move between devices.
     el.exportStats.addEventListener("click", () => exportStats());
     el.importStatsBtn.addEventListener("click", () => el.importStatsFile.click());
@@ -727,6 +789,7 @@ function exportStats() {
     exportedAt: new Date().toISOString(),
     stats: state.stats,
     settings: state.settings,
+    streak: state.streak,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -766,6 +829,13 @@ async function importStats(file) {
       el.settingHaptic.checked      = state.settings.hapticFeedback;
       el.settingFreqCap.value       = String(state.settings.frequencyCap);
       el.testLength.value           = String(state.settings.testLength);
+      applyTheme(state.settings.theme);
+      renderThemeSwitch();
+    }
+    if (data.streak) {
+      state.streak = checkStreakExpired({ ...state.streak, ...data.streak });
+      saveStreak(state.streak);
+      renderStreak();
     }
     refreshStatsPanel();
     rebuildPool();
