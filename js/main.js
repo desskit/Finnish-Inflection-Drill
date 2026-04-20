@@ -12,6 +12,10 @@ import {
 import { loadSettings, saveSettings } from "./settings.js";
 import { loadStats, saveStats, resetStats, recordOutcome } from "./stats.js";
 import { renderStats } from "./stats_ui.js";
+import {
+  loadSchedule, saveSchedule, resetSchedule,
+  gradeItem, gradeShown, GRADE, CAP_PRESETS,
+} from "./srs.js";
 import { speak, ttsAvailable, cancelSpeech } from "./tts.js";
 import { applyTheme, watchSystemTheme } from "./theme.js";
 import { loadStreak, saveStreak, recordCorrect as bumpStreak, checkExpired as checkStreakExpired } from "./streak.js";
@@ -32,6 +36,7 @@ const state = {
   verbFilters: null,
   settings: null,
   stats: null,
+  schedule: null,           // FSRS-lite schedule, { byItem: { id → entry } }
   streak: null,
   // Test mode: null when idle, otherwise { length, answered, results: [] }.
   // When `finished` is true, the results panel is on screen and new submits
@@ -51,7 +56,11 @@ const el = {
   importStatsBtn:  document.getElementById("import-stats-btn"),
   importStatsFile: document.getElementById("import-stats-file"),
   importFeedback:  document.getElementById("import-feedback"),
-  settingWeighted: document.getElementById("setting-weighted"),
+  settingPriority: document.getElementById("setting-priority-mode"),
+  settingSrsCap:   document.getElementById("setting-srs-cap"),
+  settingSrsCapRow:  document.getElementById("setting-srs-cap-row"),
+  settingSrsResetRow:document.getElementById("setting-srs-reset-row"),
+  settingSrsReset: document.getElementById("setting-srs-reset"),
   settingHaptic:   document.getElementById("setting-haptic"),
   settingFreqCap:  document.getElementById("setting-frequency-cap"),
   challenge:       document.getElementById("challenge"),
@@ -106,8 +115,15 @@ function render() {
   const label = state.mode === "noun" ? nounLabel(key, state.cfg) : verbLabel(key, state.cfg);
   el.targetForm.textContent = label;
   renderExamples(word, word.inflections[key]);
-  el.challenge.classList.remove("hidden");
-  el.answerRow.classList.remove("hidden");
+  // Only reveal the challenge/answer row when we're actually on the drill
+  // view. Some settings (excludeLong, maxAnswerLength, frequencyCap) rebuild
+  // the pool as a side effect, and without this guard the challenge would
+  // pop into view behind the Options panel while the user is toggling
+  // settings. setView("drill") handles un-hiding when we come back.
+  if (state.view === "drill") {
+    el.challenge.classList.remove("hidden");
+    el.answerRow.classList.remove("hidden");
+  }
 }
 
 // Word stem sharing: Finnish inflections often share a stem with the lemma
@@ -195,13 +211,18 @@ function speakAnswer() {
   speak(expected);
 }
 
+// Returns a promise that resolves when the utterance finishes (or a nop-
+// resolved promise when autoplay is off / muted / suppressed). Callers that
+// want to advance AFTER the audio finishes — specifically the correct-answer
+// auto-advance — can await this so the speech isn't clipped mid-word by
+// cancelSpeech() in newChallenge().
 function maybeAutoPlayAnswer() {
-  if (!state.settings.autoPlayAudio) return;
+  if (!state.settings.autoPlayAudio) return Promise.resolve();
   // Suppress audio during an active test — hearing the answer is a spoiler.
-  if (testActive()) return;
-  if (!state.current) return;
+  if (testActive()) return Promise.resolve();
+  if (!state.current) return Promise.resolve();
   const expected = state.current.word.inflections[state.current.key];
-  speak(expected);
+  return speak(expected);
 }
 
 function setFeedback(text, cls) {
@@ -228,6 +249,12 @@ function score(outcome) {
   recordOutcome(state.stats, state.mode, state.current, outcome);
   saveStats(state.stats);
   state.scoredThisChallenge = true;
+
+  // Mirror the outcome into the SRS schedule. "skipped" is deliberately
+  // neutral — we didn't learn anything about recall, so we don't want to
+  // inflate or deflate stability for it.
+  recordOutcomeToSchedule(outcome);
+
   if (outcome === "correct") {
     const before = state.streak.current;
     bumpStreak(state.streak);
@@ -237,6 +264,31 @@ function score(outcome) {
     }
   }
   refreshStatsPanel();
+}
+
+// Map a drill outcome onto an FSRS grade and persist. Only reached when we
+// have a current challenge and haven't already scored it.
+function recordOutcomeToSchedule(outcome) {
+  if (!state.current) return;
+  const cap = CAP_PRESETS[state.settings.srsCap] || CAP_PRESETS.balanced;
+  const id = `${state.mode}|${state.current.word.word}|${state.current.key}`;
+  const now = Date.now();
+
+  if (outcome === "correct") {
+    // Hints used → HARD; clean answer → GOOD. We don't surface EASY from the
+    // UI (no explicit "too easy" button); that keeps the grading pipeline
+    // simple and prevents accidental mastery from, say, hitting Enter on a
+    // pre-filled hint trail.
+    const grade = state.hintsShown > 0 ? GRADE.HARD : GRADE.GOOD;
+    gradeItem(state.schedule, id, grade, cap.capDays, now);
+  } else if (outcome === "wrong") {
+    gradeItem(state.schedule, id, GRADE.AGAIN, cap.capDays, now);
+  } else if (outcome === "shown") {
+    gradeShown(state.schedule, id, cap.capDays, now);
+  }
+  // "skipped" → no schedule update (user didn't attempt)
+
+  if (outcome !== "skipped") saveSchedule(state.schedule);
 }
 
 // The little flame badge next to the version tag. Hidden when no streak.
@@ -249,6 +301,26 @@ function renderThemeSwitch() {
     btn.classList.toggle("active", active);
     btn.setAttribute("aria-checked", active ? "true" : "false");
   }
+}
+
+// Sync the three-way priority switch to the saved value.
+function renderPrioritySwitch() {
+  if (!el.settingPriority) return;
+  const pref = state.settings.priorityMode;
+  for (const btn of el.settingPriority.querySelectorAll(".seg-btn")) {
+    const active = btn.dataset.value === pref;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-checked", active ? "true" : "false");
+  }
+}
+
+// Show the cap select + reset button only when SRS is the active mode.
+// Saves vertical space in Options and avoids implying those controls have any
+// effect in uniform/weighted modes.
+function updateSrsControlsVisibility() {
+  const srs = state.settings.priorityMode === "srs";
+  if (el.settingSrsCapRow)   el.settingSrsCapRow.classList.toggle("hidden", !srs);
+  if (el.settingSrsResetRow) el.settingSrsResetRow.classList.toggle("hidden", !srs);
 }
 
 function renderStreak() {
@@ -405,10 +477,15 @@ function testActive() {
 // ---------- drill flow ----------
 function newChallenge() {
   cancelSpeech();
+  const priority = (state.settings && state.settings.priorityMode) || "uniform";
+  const capPreset = CAP_PRESETS[state.settings && state.settings.srsCap] || CAP_PRESETS.balanced;
   state.current = nextChallenge(state.pool, state.current, {
-    weighted: !!(state.settings && state.settings.weightedSampling),
-    stats: state.stats,
-    mode: state.mode,
+    priority,
+    mode:     state.mode,
+    stats:    state.stats,
+    schedule: state.schedule,
+    srsFloor: capPreset.floor,
+    now:      Date.now(),
   });
   state.awaitingNext = false;
   state.hintsShown = 0;
@@ -421,7 +498,9 @@ function newChallenge() {
     return;
   }
   render();
-  el.answer.focus();
+  // Keep focus management scoped to the drill view — don't yank focus into
+  // a hidden answer input while the user is interacting with Options.
+  if (state.view === "drill") el.answer.focus();
 }
 
 function submit() {
@@ -448,10 +527,19 @@ function submit() {
   if (result.ok) {
     setFeedback("\u2713 correct", "ok");
     score("correct");
-    maybeAutoPlayAnswer();
     state.awaitingNext = true;
-    // Give TTS a beat to start before auto-advancing.
-    setTimeout(newChallenge, state.settings.autoPlayAudio ? 900 : 450);
+    // Advance after the TTS finishes, not on a fixed timer. Finnish words
+    // of even moderate length were getting clipped on mobile because the
+    // old 900ms timeout fired mid-utterance and newChallenge() cancels
+    // speech. The speak() promise resolves on the utterance's `end` event
+    // (or a safety timeout); we add a small buffer so the last phoneme
+    // isn't clipped by the incoming cancelSpeech(). The awaitingNext guard
+    // prevents a double-advance if the user pressed Enter/Skip first.
+    maybeAutoPlayAnswer().then(() => {
+      setTimeout(() => {
+        if (state.awaitingNext) newChallenge();
+      }, state.settings.autoPlayAudio ? 200 : 450);
+    });
   } else if (state.settings.requireCorrect) {
     // Count the first wrong attempt, then let them keep trying.
     score("wrong");
@@ -615,6 +703,7 @@ async function boot() {
     state.verbFilters = loadVerbFilters(cfg);
     state.settings    = loadSettings();
     state.stats       = loadStats();
+    state.schedule    = loadSchedule();
     state.streak      = checkStreakExpired(loadStreak());
     saveStreak(state.streak); // persist any expiry reset immediately
     renderStreak();
@@ -664,11 +753,33 @@ async function boot() {
       if (state.settings.excludeLong) rebuildPool();
     });
 
-    // Weighted sampling — no pool rebuild needed, it only affects picks.
-    el.settingWeighted.checked = state.settings.weightedSampling;
-    el.settingWeighted.addEventListener("change", () => {
-      state.settings.weightedSampling = el.settingWeighted.checked;
+    // Challenge-selection mode: Random / Focus misses / Spaced repetition.
+    // None of these rebuild the pool — they only change which item we pick
+    // from it next. The cap select and reset button only make sense in SRS
+    // mode, so we hide them in the other modes.
+    renderPrioritySwitch();
+    updateSrsControlsVisibility();
+    el.settingPriority.addEventListener("click", (e) => {
+      const btn = e.target.closest(".seg-btn");
+      if (!btn) return;
+      const value = btn.dataset.value;
+      if (!value || value === state.settings.priorityMode) return;
+      state.settings.priorityMode = value;
       saveSettings(state.settings);
+      renderPrioritySwitch();
+      updateSrsControlsVisibility();
+    });
+
+    el.settingSrsCap.value = state.settings.srsCap;
+    el.settingSrsCap.addEventListener("change", () => {
+      state.settings.srsCap = el.settingSrsCap.value;
+      saveSettings(state.settings);
+    });
+
+    el.settingSrsReset.addEventListener("click", () => {
+      if (confirm("Reset the spaced-repetition schedule? Every form will be treated as new again. This does not affect your statistics.")) {
+        state.schedule = resetSchedule();
+      }
     });
 
     // Haptic feedback
@@ -790,6 +901,7 @@ function exportStats() {
     stats: state.stats,
     settings: state.settings,
     streak: state.streak,
+    schedule: state.schedule,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -819,18 +931,31 @@ async function importStats(file) {
     saveStats(state.stats);
     if (data.settings) {
       state.settings = { ...state.settings, ...data.settings };
+      // Legacy imports might still carry weightedSampling; translate it the
+      // same way loadSettings() does so the UI below shows the right state.
+      if (Object.prototype.hasOwnProperty.call(data.settings, "weightedSampling") &&
+          !Object.prototype.hasOwnProperty.call(data.settings, "priorityMode")) {
+        state.settings.priorityMode = data.settings.weightedSampling ? "srs" : "uniform";
+      }
+      delete state.settings.weightedSampling;
       saveSettings(state.settings);
       // Reflect any changed UI-bound settings immediately.
       el.settingRequire.checked     = state.settings.requireCorrect;
       el.settingAutoplay.checked    = state.settings.autoPlayAudio;
       el.settingExcludeLong.checked = state.settings.excludeLong;
       el.settingMaxLength.value     = String(state.settings.maxAnswerLength);
-      el.settingWeighted.checked    = state.settings.weightedSampling;
+      el.settingSrsCap.value        = state.settings.srsCap;
       el.settingHaptic.checked      = state.settings.hapticFeedback;
       el.settingFreqCap.value       = String(state.settings.frequencyCap);
       el.testLength.value           = String(state.settings.testLength);
+      renderPrioritySwitch();
+      updateSrsControlsVisibility();
       applyTheme(state.settings.theme);
       renderThemeSwitch();
+    }
+    if (data.schedule && data.schedule.byItem) {
+      state.schedule = { byItem: data.schedule.byItem };
+      saveSchedule(state.schedule);
     }
     if (data.streak) {
       state.streak = checkStreakExpired({ ...state.streak, ...data.streak });

@@ -65,7 +65,26 @@ export async function speak(text) {
   u.voice = voice;
   u.lang = voice.lang || "fi-FI";
   u.rate = 0.95;  // a hair slower than default — easier to catch inflection endings
-  window.speechSynthesis.speak(u);
+
+  // Return a promise that resolves when the utterance finishes speaking
+  // (or errors, or is cancelled). Callers can `await` it to avoid clipping
+  // audio — e.g. the correct-answer auto-advance waits for `end` before
+  // calling cancelSpeech() via newChallenge().
+  //
+  // Safety net: some browsers (iOS Safari in particular) occasionally fail
+  // to fire `onend` — especially right after a page becomes visible or
+  // after rapid cancel/speak cycles. Cap the wait with a length-based
+  // estimate so a stuck engine can't freeze the drill. Rate 0.95 at ~13
+  // chars/sec gives roughly 80ms/char; add a generous fudge and a floor.
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    u.onend = finish;
+    u.onerror = finish;
+    const estMs = Math.max(1200, 120 * text.length + 700);
+    setTimeout(finish, Math.min(estMs, 8000));
+    window.speechSynthesis.speak(u);
+  });
 }
 
 export function cancelSpeech() {

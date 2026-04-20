@@ -451,6 +451,19 @@ kbd {
 .group-label   { color: var(--text); }
 .group-example { color: var(--muted); font-size: 0.85em; font-style: italic; }
 
+/* Variant for rows whose control isn't a simple checkbox+label (e.g. the
+ * priority-mode radiogroup with its explanatory footer). Stacks vertically
+ * and drops the row-level hover/pointer so it doesn't look clickable as a
+ * whole. */
+.group-row-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  cursor: default;
+}
+.group-row-stack:hover { background: transparent; }
+
 /* ---------- Settings ---------- */
 .inline-number {
   width: 4.5em;

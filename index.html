@@ -149,9 +149,13 @@
           answers don't auto-reveal; keep trying until you get it.
         </li>
         <li>
-          <strong>Focus on forms you miss</strong> &mdash; biases the random
-          picker toward forms (and, to a smaller degree, words) you tend to
-          get wrong. Everything still shows up; weak spots just show up more.
+          <strong>Challenge selection</strong> &mdash; <em>Random</em> picks
+          uniformly, <em>Focus misses</em> biases toward forms you get wrong,
+          and <em>Spaced repetition</em> (the default) uses an FSRS-lite
+          scheduler: each form gets a stability that grows when you answer
+          correctly and collapses when you miss. Items on the verge of being
+          forgotten surface most; mastered ones still re-appear at the cap
+          you pick so nothing ever disappears forever.
         </li>
         <li>
           <strong>Hide answers longer than N characters</strong> &mdash; skips
@@ -260,11 +264,37 @@
           <span class="group-label">Require correct answer to advance</span>
           <span class="group-example">wrong answers don't auto-reveal; keep trying</span>
         </label>
-        <label class="group-row">
-          <input id="setting-weighted" type="checkbox" />
-          <span class="group-label">Focus on forms you miss</span>
-          <span class="group-example">weight sampling toward forms and words you get wrong more often</span>
+        <div class="group-row group-row-stack">
+          <span class="group-label">Challenge selection</span>
+          <div id="setting-priority-mode" class="seg-switch" role="radiogroup" aria-label="Challenge selection">
+            <button type="button" class="seg-btn" data-value="uniform"  role="radio">Random</button>
+            <button type="button" class="seg-btn" data-value="weighted" role="radio">Focus misses</button>
+            <button type="button" class="seg-btn" data-value="srs"      role="radio">Spaced repetition</button>
+          </div>
+          <span class="group-example">
+            <strong>Random</strong> picks uniformly. <strong>Focus misses</strong>
+            biases toward forms you get wrong. <strong>Spaced repetition</strong>
+            (FSRS-lite) schedules each form by recall probability &mdash;
+            struggling items appear more, mastered ones less.
+          </span>
+        </div>
+        <label class="group-row" id="setting-srs-cap-row">
+          <span class="group-label">
+            Review frequency for mastered words:
+            <select id="setting-srs-cap" class="inline-select">
+              <option value="often">Often (2-week ceiling)</option>
+              <option value="balanced">Balanced (2-month ceiling)</option>
+              <option value="rarely">Rarely (6-month ceiling)</option>
+            </select>
+          </span>
+          <span class="group-example">
+            caps how long a well-known word can disappear before resurfacing
+          </span>
         </label>
+        <div class="group-row" id="setting-srs-reset-row">
+          <button id="setting-srs-reset" type="button" class="mini-btn">Reset SRS schedule</button>
+          <span class="group-example">forgets all recall data &mdash; every form becomes "new" again</span>
+        </div>
         <label class="group-row">
           <input id="setting-exclude-long" type="checkbox" />
           <span class="group-label">
@@ -315,7 +345,7 @@
           streak matters to you.
         </p>
         <div class="options-row">
-          <button id="export-stats" type="button" class="mode-btn">Export stats</button>
+          <button id="export-stats" type="button" class="mini-btn">Export stats</button>
           <button id="import-stats-btn" type="button" class="mini-btn">Import stats&hellip;</button>
           <input id="import-stats-file" type="file" accept="application/json" class="hidden" />
         </div>

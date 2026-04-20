@@ -12,7 +12,15 @@ export function defaultSettings() {
     maxAnswerLength:   15,    // only used when excludeLong is true
     testLength:        10,
     hapticFeedback:    true,  // vibrate on wrong answer (mobile only)
-    weightedSampling:  false, // bias sampling toward your weak forms
+    // Sampling strategy for the next-challenge picker. Three modes:
+    //   "uniform"  — plain random over the current pool
+    //   "weighted" — legacy miss-rate bias (pre-SRS)
+    //   "srs"      — FSRS-lite spaced repetition (default)
+    priorityMode:      "srs",
+    // How often mastered words should still surface. Maps to a (floor, cap)
+    // pair in srs.js: higher "often" → mastered words re-appear sooner.
+    //   "often" | "balanced" | "rarely"
+    srsCap:            "balanced",
     frequencyCap:      0,     // 0 = no cap, otherwise only include words whose
                               // best rank is <= this value. Matches the cutoff
                               // used by scripts/extract.py at build time.
@@ -23,7 +31,16 @@ export function defaultSettings() {
 export function loadSettings() {
   const stored = storage.load(KEY, null);
   if (!stored) return defaultSettings();
-  return { ...defaultSettings(), ...stored };
+  const merged = { ...defaultSettings(), ...stored };
+  // Legacy migration: `weightedSampling` was a boolean checkbox in <=v0.11.
+  // Translate it to the new three-way priority mode exactly once, then drop
+  // the old key so it doesn't keep overriding the user's new choice.
+  if (Object.prototype.hasOwnProperty.call(stored, "weightedSampling") &&
+      !Object.prototype.hasOwnProperty.call(stored, "priorityMode")) {
+    merged.priorityMode = stored.weightedSampling ? "srs" : "uniform";
+  }
+  delete merged.weightedSampling;
+  return merged;
 }
 
 export function saveSettings(s) { storage.save(KEY, s); }

@@ -4,6 +4,8 @@
 // The pool is rebuilt whenever filters change. Filter application lives here
 // so all filter logic is in one place.
 
+import { retrievability } from "./srs.js";
+
 function randomChoice(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -98,15 +100,22 @@ function verbKeyAllowed(key, filters) {
 // ---------- shared ----------
 
 /**
- * Pick the next challenge. Uniform random unless `opts.weighted` is provided,
- * in which case items are weighted by how much the user has been getting them
- * wrong (see itemWeight below). The `previous` avoid-repeat nudge still fires
- * either way.
+ * Pick the next challenge. `opts.priority` selects the strategy:
+ *   "uniform"  — plain random
+ *   "weighted" — bias toward items the user has been missing (legacy mode,
+ *                pre-SRS — kept as an option for users who preferred it)
+ *   "srs"      — FSRS-lite: weight by (1 - retrievability), floored so
+ *                mastered items still surface occasionally
+ * The `previous` avoid-repeat nudge fires for all modes.
  */
 export function nextChallenge(pool, previous, opts) {
   if (pool.length === 0) return null;
+  const priority = (opts && opts.priority) || "uniform";
   const pick = () => {
-    if (opts && opts.weighted && opts.stats && opts.mode) {
+    if (priority === "srs" && opts.schedule && opts.mode) {
+      return srsPick(pool, opts.mode, opts.schedule, opts.srsFloor, opts.now);
+    }
+    if (priority === "weighted" && opts.stats && opts.mode) {
       return weightedPick(pool, opts.mode, opts.stats);
     }
     return randomChoice(pool);
@@ -167,6 +176,38 @@ function weightedPick(pool, mode, stats) {
 
     let w = 1 + 2.0 * itemMiss + 0.5 * wordMiss;
     if (attempted === 0) w += 0.6; // small explore bonus for unseen forms
+    weights[i] = w;
+    total += w;
+  }
+
+  let r = Math.random() * total;
+  for (let i = 0; i < pool.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return pool[i];
+  }
+  return pool[pool.length - 1];
+}
+
+/**
+ * SRS picker. Each item's weight is max(floor, 1 - R) where R is the current
+ * retrievability from the schedule entry. Unseen items have R=0, so they get
+ * weight 1 — higher than the floor, guaranteeing they surface. The floor
+ * keeps mastered items (R≈1) from vanishing entirely. One O(pool) pass, the
+ * schedule lookup is O(1) per item (plain object map).
+ */
+function srsPick(pool, mode, schedule, floor, now) {
+  const byItem = (schedule && schedule.byItem) || {};
+  const f = typeof floor === "number" ? floor : 0.1;
+  const t = typeof now === "number" ? now : Date.now();
+
+  let total = 0;
+  const weights = new Array(pool.length);
+  for (let i = 0; i < pool.length; i++) {
+    const item = pool[i];
+    const id = `${mode}|${item.word.word}|${item.key}`;
+    const entry = byItem[id];
+    const R = retrievability(entry, t);
+    const w = Math.max(f, 1 - R);
     weights[i] = w;
     total += w;
   }
