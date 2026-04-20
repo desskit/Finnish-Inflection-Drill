@@ -434,6 +434,46 @@ kbd {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
+.inline-select {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.2rem 0.45rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  margin: 0 0.2rem;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.inline-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* ---------- Options panel ---------- */
+#options-panel h2 {
+  color: var(--accent);
+  font-size: 1.2rem;
+  margin: 0 0 0.6rem;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+.options-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+.import-feedback {
+  min-height: 1.2em;
+  margin: 0.6rem 0 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.import-feedback.ok  { color: var(--ok); }
+.import-feedback.bad { color: var(--danger); }
 
 /* ---------- Test mode ---------- */
 .test-controls { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }

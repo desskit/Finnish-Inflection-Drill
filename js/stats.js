@@ -11,6 +11,7 @@
 //   byVerbPolarity: { "<polarityId>":      { ... } },
 //   byVerbPerson:   { "<personId>":        { ... } },
 //   byVerbGroup:    { "<groupId>":         { ... } },
+//   byItem:         { "<mode>|<word>|<key>": { ... } },  // for weighted sampling
 // }
 //
 // One attempt = one outcome recorded. Outcomes: correct | wrong | shown | skipped.
@@ -38,6 +39,7 @@ export function defaultStats() {
     byVerbPolarity: {},
     byVerbPerson:   {},
     byVerbGroup:    {},
+    byItem:         {},
   };
 }
 
@@ -55,6 +57,7 @@ export function loadStats() {
     byVerbPolarity: stored.byVerbPolarity || {},
     byVerbPerson:   stored.byVerbPerson   || {},
     byVerbGroup:    stored.byVerbGroup    || {},
+    byItem:         stored.byItem         || {},
   };
 }
 
@@ -70,6 +73,10 @@ function bump(bucketMap, id, outcome) {
   if (!id) return;
   if (!bucketMap[id]) bucketMap[id] = emptyBucket();
   bucketMap[id][outcome]++;
+}
+
+export function itemId(mode, challenge) {
+  return `${mode}|${challenge.word.word}|${challenge.key}`;
 }
 
 /**
@@ -95,6 +102,7 @@ export function recordOutcome(stats, mode, challenge, outcome) {
     bump(stats.byVerbPerson,   p.person,            outcome);
     bump(stats.byVerbGroup,    challenge.word.group, outcome);
   }
+  bump(stats.byItem, itemId(mode, challenge), outcome);
   return stats;
 }
 

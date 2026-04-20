@@ -28,9 +28,10 @@
     <header class="app-header">
       <h1>Finnish Inflection Drill <small id="app-version" class="version"></small></h1>
       <div class="mode-switch" role="tablist">
-        <button id="mode-noun"  class="mode-btn" role="tab" aria-selected="true">Nouns</button>
-        <button id="mode-verb"  class="mode-btn" role="tab" aria-selected="false">Verbs</button>
-        <button id="mode-about" class="mode-btn" role="tab" aria-selected="false">About</button>
+        <button id="mode-noun"    class="mode-btn" role="tab" aria-selected="true">Nouns</button>
+        <button id="mode-verb"    class="mode-btn" role="tab" aria-selected="false">Verbs</button>
+        <button id="mode-options" class="mode-btn" role="tab" aria-selected="false">Options</button>
+        <button id="mode-about"   class="mode-btn" role="tab" aria-selected="false">About</button>
       </div>
     </header>
 
@@ -125,7 +126,28 @@
           <strong>Hide answers longer than N characters</strong> &mdash; skips
           awkwardly long forms (partitive plurals, compounds, etc.).
         </li>
+        <li>
+          <strong>Focus on forms you miss</strong> &mdash; biases the random
+          picker toward forms (and, to a smaller degree, words) you tend to get
+          wrong. Everything still shows up; weak spots just show up more.
+        </li>
+        <li>
+          <strong>Vibrate on wrong answer</strong> &mdash; short haptic buzz on
+          mobile devices that support it.
+        </li>
+        <li>
+          <strong>Limit pool to most-common words</strong> &mdash; restricts
+          drills to the top N most common Finnish words by frequency rank.
+          Helpful early on; turn it off once the basics feel solid.
+        </li>
       </ul>
+
+      <h3>Options</h3>
+      <p>
+        Export your stats to a JSON file to back them up, or import a previous
+        export to restore them. Stats live in your browser's local storage, so
+        they don't follow you across devices unless you move them manually.
+      </p>
 
       <h3>Hints &amp; shortcuts</h3>
       <ul class="shortcuts">
@@ -195,9 +217,47 @@
         </span>
         <span class="group-example">skips awkward partitive-plural, compound, etc.</span>
       </label>
+      <label class="group-row">
+        <input id="setting-weighted" type="checkbox" />
+        <span class="group-label">Focus on forms you miss</span>
+        <span class="group-example">weight sampling toward forms and words you get wrong more often</span>
+      </label>
+      <label class="group-row">
+        <input id="setting-haptic" type="checkbox" />
+        <span class="group-label">Vibrate on wrong answer</span>
+        <span class="group-example">short haptic buzz on mobile (ignored if unsupported)</span>
+      </label>
+      <label class="group-row">
+        <span class="group-label">
+          Limit pool to most-common words:
+          <select id="setting-frequency-cap" class="inline-select">
+            <option value="0">All words</option>
+            <option value="1000">Top 1,000</option>
+            <option value="2500">Top 2,500</option>
+            <option value="5000">Top 5,000</option>
+            <option value="10000">Top 10,000</option>
+          </select>
+        </span>
+        <span class="group-example">drops rarer words entirely &mdash; useful for early study</span>
+      </label>
       <p id="tts-warning" class="tts-warning hidden">
         No Finnish voice installed on this device &mdash; audio will be silent.
       </p>
+    </section>
+
+    <section id="options-panel" class="panel hidden" aria-label="Options">
+      <h2>Options</h2>
+      <p class="panel-description">
+        Back up or restore your drill statistics. Stats are stored in your
+        browser and are lost if you clear site data or switch devices &mdash;
+        export occasionally if your streak matters to you.
+      </p>
+      <div class="options-row">
+        <button id="export-stats" type="button" class="mode-btn">Export stats</button>
+        <button id="import-stats-btn" type="button" class="mini-btn">Import stats&hellip;</button>
+        <input id="import-stats-file" type="file" accept="application/json" class="hidden" />
+      </div>
+      <p id="import-feedback" class="import-feedback"></p>
     </section>
 
     <section id="test-panel" class="panel" aria-label="Test mode">

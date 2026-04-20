@@ -18,7 +18,7 @@ import { APP_VERSION } from "./version.js";
 // ---------- state ----------
 const state = {
   mode: "noun",             // "noun" | "verb" — which pool we're drilling
-  view: "drill",            // "drill" | "about" — which top-level view is shown
+  view: "drill",            // "drill" | "options" | "about" — top-level view
   cfg: null,
   data: null,
   pool: [],
@@ -40,8 +40,17 @@ const state = {
 const el = {
   modeNoun:        document.getElementById("mode-noun"),
   modeVerb:        document.getElementById("mode-verb"),
+  modeOptions:     document.getElementById("mode-options"),
   modeAbout:       document.getElementById("mode-about"),
   about:           document.getElementById("about"),
+  optionsPanel:    document.getElementById("options-panel"),
+  exportStats:     document.getElementById("export-stats"),
+  importStatsBtn:  document.getElementById("import-stats-btn"),
+  importStatsFile: document.getElementById("import-stats-file"),
+  importFeedback:  document.getElementById("import-feedback"),
+  settingWeighted: document.getElementById("setting-weighted"),
+  settingHaptic:   document.getElementById("setting-haptic"),
+  settingFreqCap:  document.getElementById("setting-frequency-cap"),
   challenge:       document.getElementById("challenge"),
   answerRow:       document.getElementById("answer-row"),
   headword:        document.getElementById("headword"),
@@ -355,7 +364,11 @@ function testActive() {
 // ---------- drill flow ----------
 function newChallenge() {
   cancelSpeech();
-  state.current = nextChallenge(state.pool, state.current);
+  state.current = nextChallenge(state.pool, state.current, {
+    weighted: !!(state.settings && state.settings.weightedSampling),
+    stats: state.stats,
+    mode: state.mode,
+  });
   state.awaitingNext = false;
   state.hintsShown = 0;
   state.scoredThisChallenge = false;
@@ -401,14 +414,24 @@ function submit() {
   } else if (state.settings.requireCorrect) {
     // Count the first wrong attempt, then let them keep trying.
     score("wrong");
+    buzzIfWrong();
     setFeedback("\u2717 not quite \u2014 try again", "bad");
     el.answer.select();
   } else {
     score("wrong");
+    buzzIfWrong();
     setFeedback(`\u2717 expected: ${result.expected}`, "bad");
     maybeAutoPlayAnswer();
     state.awaitingNext = true;
   }
+}
+
+// Short haptic buzz on wrong answers for mobile. No-op if the browser doesn't
+// support navigator.vibrate (desktop Chrome is fine; iOS Safari ignores it).
+function buzzIfWrong() {
+  if (!state.settings || !state.settings.hapticFeedback) return;
+  if (typeof navigator === "undefined" || !navigator.vibrate) return;
+  try { navigator.vibrate(40); } catch { /* ignore */ }
 }
 
 function revealNextLetter() {
@@ -467,25 +490,38 @@ function rebuildPool() {
     });
   }
 
+  // Optional frequency cap — restrict to words whose best inflected-form rank
+  // is within the top N. Words with no rank (null) fall outside any cap.
+  if (state.settings && state.settings.frequencyCap > 0) {
+    const cap = state.settings.frequencyCap;
+    pool = pool.filter(({ word }) => {
+      const r = word.frequency_rank;
+      return typeof r === "number" && r <= cap;
+    });
+  }
+
   state.pool = pool;
   updateStatus();
   newChallenge();
 }
 
-// Reflect current tab selection on the three buttons.
+// Reflect current tab selection on the four buttons.
 function updateTabAria() {
   const drill = state.view === "drill";
-  el.modeNoun.setAttribute("aria-selected",  drill && state.mode === "noun" ? "true" : "false");
-  el.modeVerb.setAttribute("aria-selected",  drill && state.mode === "verb" ? "true" : "false");
-  el.modeAbout.setAttribute("aria-selected", state.view === "about"          ? "true" : "false");
+  el.modeNoun.setAttribute("aria-selected",    drill && state.mode === "noun" ? "true" : "false");
+  el.modeVerb.setAttribute("aria-selected",    drill && state.mode === "verb" ? "true" : "false");
+  el.modeOptions.setAttribute("aria-selected", state.view === "options"       ? "true" : "false");
+  el.modeAbout.setAttribute("aria-selected",   state.view === "about"         ? "true" : "false");
 }
 
-// Show or hide the drill UI vs the about panel. Doesn't touch the drill
-// state (pool, current challenge, stats) — clicking About and back should
-// leave your place.
+// Show or hide the drill UI vs the standalone panels (About, Options).
+// Doesn't touch drill state (pool, current challenge, stats) — leaving and
+// returning should preserve your place.
 function setView(view) {
   state.view = view;
-  const drill = view === "drill";
+  const drill   = view === "drill";
+  const options = view === "options";
+  const about   = view === "about";
   // Drill-only chrome: only show if we're in drill view AND we have something
   // to drill (otherwise the "hidden" class from newChallenge wins).
   el.challenge.classList.toggle("hidden", !(drill && state.current));
@@ -493,12 +529,12 @@ function setView(view) {
   el.filtersNoun.classList.toggle("hidden", !(drill && state.mode === "noun"));
   el.filtersVerb.classList.toggle("hidden", !(drill && state.mode === "verb"));
   // Settings / test / stats / status line are only for the drill workflow.
-  // About is a standalone read-only view.
   el.settingsPanel.classList.toggle("hidden", !drill);
   el.testPanel.classList.toggle("hidden",     !drill);
   el.statsPanel.classList.toggle("hidden",    !drill);
   el.statusLine.classList.toggle("hidden",    !drill);
-  el.about.classList.toggle("hidden", drill);
+  el.about.classList.toggle("hidden",          !about);
+  el.optionsPanel.classList.toggle("hidden",   !options);
   updateTabAria();
   if (drill) el.answer.focus();
 }
@@ -578,6 +614,29 @@ async function boot() {
       if (state.settings.excludeLong) rebuildPool();
     });
 
+    // Weighted sampling — no pool rebuild needed, it only affects picks.
+    el.settingWeighted.checked = state.settings.weightedSampling;
+    el.settingWeighted.addEventListener("change", () => {
+      state.settings.weightedSampling = el.settingWeighted.checked;
+      saveSettings(state.settings);
+    });
+
+    // Haptic feedback
+    el.settingHaptic.checked = state.settings.hapticFeedback;
+    el.settingHaptic.addEventListener("change", () => {
+      state.settings.hapticFeedback = el.settingHaptic.checked;
+      saveSettings(state.settings);
+    });
+
+    // Frequency cap — select reflects saved value; change rebuilds the pool.
+    el.settingFreqCap.value = String(state.settings.frequencyCap);
+    el.settingFreqCap.addEventListener("change", () => {
+      const n = parseInt(el.settingFreqCap.value, 10) || 0;
+      state.settings.frequencyCap = n;
+      saveSettings(state.settings);
+      rebuildPool();
+    });
+
     // Test mode
     el.testLength.value = String(state.settings.testLength);
     el.testStart.addEventListener("click", () => startTest());
@@ -620,9 +679,19 @@ async function boot() {
       }
     });
 
-    el.modeNoun.addEventListener("click",  () => setMode("noun"));
-    el.modeVerb.addEventListener("click",  () => setMode("verb"));
-    el.modeAbout.addEventListener("click", () => setView("about"));
+    el.modeNoun.addEventListener("click",    () => setMode("noun"));
+    el.modeVerb.addEventListener("click",    () => setMode("verb"));
+    el.modeOptions.addEventListener("click", () => setView("options"));
+    el.modeAbout.addEventListener("click",   () => setView("about"));
+
+    // Stats export / import — JSON files you can move between devices.
+    el.exportStats.addEventListener("click", () => exportStats());
+    el.importStatsBtn.addEventListener("click", () => el.importStatsFile.click());
+    el.importStatsFile.addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) importStats(file);
+      el.importStatsFile.value = "";
+    });
 
     el.hintLetter.addEventListener("click", revealNextLetter);
     el.hintAnswer.addEventListener("click", showFullAnswer);
@@ -644,6 +713,73 @@ async function boot() {
 }
 
 boot();
+
+// ---------- stats export / import ----------
+// Stats live in localStorage, which is per-device and per-browser. Exporting
+// lets you back them up or move them to another device; importing replaces
+// the current stats wholesale. We also bundle settings so the whole user
+// state travels together.
+
+function exportStats() {
+  const payload = {
+    app: "finnish-inflection-drill",
+    version: APP_VERSION,
+    exportedAt: new Date().toISOString(),
+    stats: state.stats,
+    settings: state.settings,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `finnish-drill-stats-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  setImportFeedback("Exported stats.", "ok");
+}
+
+async function importStats(file) {
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!data || data.app !== "finnish-inflection-drill" || !data.stats) {
+      throw new Error("file doesn't look like a drill export");
+    }
+    if (!confirm("Replace your current stats with the imported data? This cannot be undone.")) {
+      setImportFeedback("Import cancelled.", "");
+      return;
+    }
+    state.stats = data.stats;
+    saveStats(state.stats);
+    if (data.settings) {
+      state.settings = { ...state.settings, ...data.settings };
+      saveSettings(state.settings);
+      // Reflect any changed UI-bound settings immediately.
+      el.settingRequire.checked     = state.settings.requireCorrect;
+      el.settingAutoplay.checked    = state.settings.autoPlayAudio;
+      el.settingExcludeLong.checked = state.settings.excludeLong;
+      el.settingMaxLength.value     = String(state.settings.maxAnswerLength);
+      el.settingWeighted.checked    = state.settings.weightedSampling;
+      el.settingHaptic.checked      = state.settings.hapticFeedback;
+      el.settingFreqCap.value       = String(state.settings.frequencyCap);
+      el.testLength.value           = String(state.settings.testLength);
+    }
+    refreshStatsPanel();
+    rebuildPool();
+    setImportFeedback(`Imported stats (exported ${data.exportedAt || "earlier"}).`, "ok");
+  } catch (err) {
+    setImportFeedback(`Import failed: ${err.message}`, "bad");
+  }
+}
+
+function setImportFeedback(text, cls) {
+  if (!el.importFeedback) return;
+  el.importFeedback.textContent = text;
+  el.importFeedback.className = "import-feedback" + (cls ? " " + cls : "");
+}
 
 // Register the service worker so the app is installable and works offline.
 // We don't await this — it's a fire-and-forget side effect, and if it fails

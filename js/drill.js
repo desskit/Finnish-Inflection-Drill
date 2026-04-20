@@ -97,13 +97,86 @@ function verbKeyAllowed(key, filters) {
 
 // ---------- shared ----------
 
-export function nextChallenge(pool, previous) {
+/**
+ * Pick the next challenge. Uniform random unless `opts.weighted` is provided,
+ * in which case items are weighted by how much the user has been getting them
+ * wrong (see itemWeight below). The `previous` avoid-repeat nudge still fires
+ * either way.
+ */
+export function nextChallenge(pool, previous, opts) {
   if (pool.length === 0) return null;
-  let pick = randomChoice(pool);
-  for (let tries = 0; tries < 5 && previous && pick.word === previous.word && pick.key === previous.key; tries++) {
-    pick = randomChoice(pool);
+  const pick = () => {
+    if (opts && opts.weighted && opts.stats && opts.mode) {
+      return weightedPick(pool, opts.mode, opts.stats);
+    }
+    return randomChoice(pool);
+  };
+  let chosen = pick();
+  for (let tries = 0; tries < 5 && previous && chosen.word === previous.word && chosen.key === previous.key; tries++) {
+    chosen = pick();
   }
-  return pick;
+  return chosen;
+}
+
+/**
+ * Weight by miss rate. Unattempted items get a slight boost so they still
+ * surface — the goal is to accelerate learning, not lock the user inside a
+ * loop of their worst 10 forms. Per-word accuracy also contributes at a
+ * smaller weight so a chronically-wrong lemma gets modest extra exposure
+ * across all its forms.
+ *
+ *   w = 1
+ *     + 2.0 * itemMissRate        (main signal; 0 if never attempted)
+ *     + 0.5 * wordMissRate        (small cross-form nudge)
+ *     + 0.6 if never attempted    (explore bonus)
+ */
+function weightedPick(pool, mode, stats) {
+  const byItem = stats.byItem || {};
+
+  // One pass over byItem to build a per-word miss-rate table. This avoids the
+  // O(pool * byItem) blowup we'd get if we aggregated per lookup — pool can
+  // easily be 100k+ entries in an unfiltered verb drill.
+  const wordAgg = new Map(); // wordKey → { att, miss }
+  const modePrefix = mode + "|";
+  for (const key in byItem) {
+    if (!key.startsWith(modePrefix)) continue;
+    // key shape: "<mode>|<word>|<infl>"
+    const second = key.indexOf("|", modePrefix.length);
+    if (second < 0) continue;
+    const wkey = key.slice(0, second);
+    const b = byItem[key];
+    const att  = b.correct + b.wrong + b.shown + b.skipped;
+    const miss = b.wrong + b.shown + b.skipped;
+    const prev = wordAgg.get(wkey);
+    if (prev) { prev.att += att; prev.miss += miss; }
+    else       wordAgg.set(wkey, { att, miss });
+  }
+
+  let total = 0;
+  const weights = new Array(pool.length);
+  for (let i = 0; i < pool.length; i++) {
+    const item = pool[i];
+    const wkey = `${mode}|${item.word.word}`;
+    const id   = `${wkey}|${item.key}`;
+    const b    = byItem[id];
+    const attempted = b ? b.correct + b.wrong + b.shown + b.skipped : 0;
+    const itemMiss  = attempted > 0 ? (b.wrong + b.shown + b.skipped) / attempted : 0;
+
+    const wa = wordAgg.get(wkey);
+    const wordMiss = wa && wa.att > 0 ? wa.miss / wa.att : 0;
+
+    let w = 1 + 2.0 * itemMiss + 0.5 * wordMiss;
+    if (attempted === 0) w += 0.6; // small explore bonus for unseen forms
+    weights[i] = w;
+    total += w;
+  }
+
+  let r = Math.random() * total;
+  for (let i = 0; i < pool.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return pool[i];
+  }
+  return pool[pool.length - 1];
 }
 
 export function checkAnswer(challenge, input) {
