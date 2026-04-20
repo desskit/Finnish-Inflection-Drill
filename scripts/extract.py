@@ -258,14 +258,43 @@ def extract_examples(entry: dict) -> list[dict]:
 
 
 def shape_noun(entry: dict, kotus_type: int | None, group: str) -> dict:
-    inflections: dict[str, str] = {}
+    # Wiktionary emits six variants per case+number slot, all tagged
+    # identically: one bare form followed by the 1sg / 2sg / 1pl / 2pl / 3rd
+    # possessive variants. For most cases the bare form appears first, so
+    # "first wins" does the right thing. The COMITATIVE case is special —
+    # it has no bare form (the case inherently requires a possessive), and
+    # Wiktionary lists it in the order 1sg, 2sg, 1pl, 2pl, 3rd. A naive
+    # first-wins pick grabs the 1sg form (e.g. "myytteineni"), which the
+    # app can't reasonably expect the user to produce from a prompt that
+    # just says "comitative plural". The 3rd-person form (e.g.
+    # "myytteineen") is the conventional citation form in reference
+    # tables, so we prefer it: filter out anything ending in a non-3rd-
+    # person possessive suffix, take what's left.
+    POSS_NON_3RD_ENDINGS = ("ni", "si", "mme", "nne")
+
+    candidates: dict[str, list[str]] = {}
     for f in entry.get("forms") or []:
         form_str = f.get("form")
         if not form_str or form_str in ("-", "—"):
             continue
         key = noun_form_key(tag_set(f))
-        if key and key not in inflections:
-            inflections[key] = form_str
+        if not key:
+            continue
+        candidates.setdefault(key, []).append(form_str)
+
+    inflections: dict[str, str] = {}
+    for key, forms in candidates.items():
+        if key == "comitative_plural":
+            # Prefer the first form NOT ending in a 1st/2nd-person possessive
+            # marker. Fall back to the first candidate if all of them do (data
+            # anomaly — shouldn't happen with kaikki's current shape).
+            third = next(
+                (f for f in forms if not f.endswith(POSS_NON_3RD_ENDINGS)),
+                None,
+            )
+            inflections[key] = third if third is not None else forms[0]
+        else:
+            inflections[key] = forms[0]
     return {
         "word": entry["word"],
         "translations": extract_translations(entry),
