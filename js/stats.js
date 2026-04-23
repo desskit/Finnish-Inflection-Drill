@@ -40,6 +40,11 @@ export function defaultStats() {
     byVerbPerson:   {},
     byVerbGroup:    {},
     byItem:         {},
+    // Timeline for the "avg reviews/day" summary. We don't store per-day
+    // buckets — just the first-ever review timestamp and a running counter —
+    // so the computation is one subtraction, one division. Honest but coarse.
+    firstReviewAt:  null,  // ms since epoch, set on first recordOutcome
+    totalReviews:   0,     // every outcome (correct/wrong/shown/skipped) counts
   };
 }
 
@@ -58,6 +63,12 @@ export function loadStats() {
     byVerbPerson:   stored.byVerbPerson   || {},
     byVerbGroup:    stored.byVerbGroup    || {},
     byItem:         stored.byItem         || {},
+    // Migration: older stores don't have these fields. Leaving firstReviewAt
+    // null means the first recordOutcome after update stamps "now" — we'd
+    // rather under-report "avg/day since tracking started" than pretend we
+    // know how long existing users have been drilling.
+    firstReviewAt:  typeof stored.firstReviewAt === "number" ? stored.firstReviewAt : null,
+    totalReviews:   typeof stored.totalReviews  === "number" ? stored.totalReviews  : 0,
   };
 }
 
@@ -90,6 +101,8 @@ export function recordOutcome(stats, mode, challenge, outcome) {
   if (!challenge || !challenge.word || !challenge.key) return stats;
 
   stats.totals[outcome]++;
+  stats.totalReviews = (stats.totalReviews || 0) + 1;
+  if (!stats.firstReviewAt) stats.firstReviewAt = Date.now();
 
   if (mode === "noun") {
     bump(stats.byNounCase,  challenge.key,        outcome);
@@ -107,6 +120,29 @@ export function recordOutcome(stats, mode, challenge, outcome) {
 }
 
 // ----- summary helpers used by the UI -----
+
+/**
+ * Average reviews per day since the user's first recorded outcome.
+ *
+ *   { value: number | null, days: number }
+ *
+ * Returns null for `value` when we can't yet compute an honest average —
+ * i.e. either there's no first-review timestamp yet (migrated user who hasn't
+ * answered since update) or less than one full day has elapsed. The UI falls
+ * back to a dash in that case. Days is reported floored; we don't want to
+ * show "0.3 days" in a user-facing summary.
+ */
+export function averageReviewsPerDay(stats, now) {
+  const t = typeof now === "number" ? now : Date.now();
+  const first = stats.firstReviewAt;
+  const total = stats.totalReviews || 0;
+  if (!first || total === 0) return { value: null, days: 0 };
+  const elapsedMs = Math.max(0, t - first);
+  const days = elapsedMs / (1000 * 60 * 60 * 24);
+  // Less than one full day → not enough signal. Show "—" until tomorrow.
+  if (days < 1) return { value: null, days: Math.floor(days) };
+  return { value: total / days, days: Math.floor(days) };
+}
 
 export function accuracy(bucket) {
   const attempted = bucket.correct + bucket.wrong;

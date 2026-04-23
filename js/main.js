@@ -25,6 +25,16 @@ import { applyTheme, watchSystemTheme } from "./theme.js";
 import { loadStreak, saveStreak, recordCorrect as bumpStreak, checkExpired as checkStreakExpired } from "./streak.js";
 import { APP_VERSION } from "./version.js";
 
+// Export-file schema version. Bumped only when the shape of the export
+// payload changes in a way that older code can't read directly — e.g. a key
+// rename inside stats.byItem, or restructuring schedule entries. The app
+// version (APP_VERSION) bumps on every release regardless.
+//
+// Stamped at 1 for the 1.0 release as the trust contract: any export from
+// here on will remain importable, with in-code migrations bridging future
+// schema bumps.
+const EXPORT_SCHEMA = 1;
+
 // ---------- state ----------
 const state = {
   mode: "noun",             // "noun" | "verb" — which pool we're drilling
@@ -67,6 +77,7 @@ const el = {
   settingSrsResetRow:document.getElementById("setting-srs-reset-row"),
   settingSrsReset: document.getElementById("setting-srs-reset"),
   settingHaptic:   document.getElementById("setting-haptic"),
+  settingShowStreak: document.getElementById("setting-show-streak"),
   settingFreqCap:  document.getElementById("setting-frequency-cap"),
   challenge:       document.getElementById("challenge"),
   answerRow:       document.getElementById("answer-row"),
@@ -333,8 +344,11 @@ function updateSrsControlsVisibility() {
 
 function renderStreak() {
   if (!el.streakBadge) return;
+  // Two independent reasons to hide the badge: the user opted out, or there's
+  // no active streak to show. Either condition collapses it entirely.
+  const showStreak = !!(state.settings && state.settings.showStreak);
   const n = state.streak && state.streak.current;
-  if (!n) {
+  if (!showStreak || !n) {
     el.streakBadge.classList.add("hidden");
     el.streakBadge.textContent = "";
     return;
@@ -917,6 +931,16 @@ async function boot() {
       saveSettings(state.settings);
     });
 
+    // Streak visibility — opt-in for new users, grandfathered on for existing
+    // ones via loadSettings. Toggle re-renders the badge so the change is
+    // instant; no reload needed.
+    el.settingShowStreak.checked = state.settings.showStreak;
+    el.settingShowStreak.addEventListener("change", () => {
+      state.settings.showStreak = el.settingShowStreak.checked;
+      saveSettings(state.settings);
+      renderStreak();
+    });
+
     // Frequency cap — select reflects saved value; change rebuilds the pool.
     el.settingFreqCap.value = String(state.settings.frequencyCap);
     el.settingFreqCap.addEventListener("change", () => {
@@ -1030,6 +1054,7 @@ function exportStats() {
   const payload = {
     app: "finnish-inflection-drill",
     version: APP_VERSION,
+    schemaVersion: EXPORT_SCHEMA,
     exportedAt: new Date().toISOString(),
     stats: state.stats,
     settings: state.settings,
@@ -1057,6 +1082,16 @@ async function importStats(file) {
     if (!data || data.app !== "finnish-inflection-drill" || !data.stats) {
       throw new Error("file doesn't look like a drill export");
     }
+    // Schema check. Files missing the field are assumed to be pre-1.0
+    // exports (schema 1 shape, just without the stamp). Anything newer than
+    // we know about gets rejected rather than silently half-imported.
+    const schemaVersion = typeof data.schemaVersion === "number" ? data.schemaVersion : 1;
+    if (schemaVersion > EXPORT_SCHEMA) {
+      throw new Error(
+        `export is from a newer schema (v${schemaVersion}) than this app understands (v${EXPORT_SCHEMA}). ` +
+        `Update the app and try again.`
+      );
+    }
     if (!confirm("Replace your current stats with the imported data? This cannot be undone.")) {
       setImportFeedback("Import cancelled.", "");
       return;
@@ -1080,6 +1115,7 @@ async function importStats(file) {
       el.settingMaxLength.value     = String(state.settings.maxAnswerLength);
       el.settingSrsCap.value        = state.settings.srsCap;
       el.settingHaptic.checked      = state.settings.hapticFeedback;
+      el.settingShowStreak.checked  = state.settings.showStreak;
       el.settingFreqCap.value       = String(state.settings.frequencyCap);
       el.testLength.value           = String(state.settings.testLength);
       renderPrioritySwitch();
@@ -1121,10 +1157,60 @@ function setImportFeedback(text, cls) {
 // Register the service worker so the app is installable and works offline.
 // We don't await this — it's a fire-and-forget side effect, and if it fails
 // the app still works, just without caching.
+//
+// We also attach the update-banner plumbing here: when the browser detects
+// a new sw.js on the server, it installs it as the "waiting" worker. Without
+// this, the user has to refresh twice to pick up the new version (first
+// refresh loads the cached old shell, second refresh gets the new one). The
+// banner bridges that gap — one click and the page reloads onto the new SW.
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch((err) => {
-      console.warn("Service worker registration failed:", err);
+    navigator.serviceWorker.register("sw.js")
+      .then((reg) => wireUpdateBanner(reg))
+      .catch((err) => {
+        console.warn("Service worker registration failed:", err);
+      });
+  });
+}
+
+function wireUpdateBanner(reg) {
+  const banner  = document.getElementById("update-banner");
+  const reload  = document.getElementById("update-banner-reload");
+  const dismiss = document.getElementById("update-banner-dismiss");
+  if (!banner || !reload || !dismiss) return;
+
+  const show = () => banner.classList.remove("hidden");
+  const hide = () => banner.classList.add("hidden");
+
+  // An already-waiting worker may exist if the user opened the tab after an
+  // update installed on a previous visit. Surface it straight away.
+  if (reg.waiting && navigator.serviceWorker.controller) show();
+
+  // Normal update flow: updatefound fires when a new worker starts
+  // installing. Watch its state; once it hits "installed" and there's a
+  // controller (i.e. this page is currently being served by an older SW),
+  // we've got a pending upgrade.
+  reg.addEventListener("updatefound", () => {
+    const nw = reg.installing;
+    if (!nw) return;
+    nw.addEventListener("statechange", () => {
+      if (nw.state === "installed" && navigator.serviceWorker.controller) show();
     });
   });
+
+  reload.addEventListener("click", () => {
+    const waiting = reg.waiting;
+    if (!waiting) { location.reload(); return; }
+    // Reload once the new worker takes control — controllerchange means
+    // skipWaiting has landed and we're now serving from the new cache.
+    let reloading = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloading) return;
+      reloading = true;
+      location.reload();
+    });
+    waiting.postMessage({ type: "SKIP_WAITING" });
+  });
+
+  dismiss.addEventListener("click", hide);
 }

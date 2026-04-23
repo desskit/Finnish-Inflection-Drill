@@ -11,7 +11,17 @@ function randomChoice(arr) {
 }
 
 function normalize(s) {
-  return (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  // Apostrophe-family normalization: mobile keyboards (and "smart quotes" on
+  // desktops) happily substitute typographic quotes for the plain ASCII '
+  // that the dataset stores. Without mapping these together, answers like
+  // "vuo'den" silently fail when the user typed the visually-identical
+  // "vuo\u2019den" (right single quote). Finnish orthography only uses a
+  // plain apostrophe, so collapsing the whole family to ' is safe.
+  return (s || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[\u2018\u2019\u201A\u201B\u02BC\u00B4\u0060]/g, "'");
 }
 
 // ---------- noun pool ----------
@@ -19,7 +29,12 @@ function normalize(s) {
 export function buildNounPool(data, filters) {
   const pool = [];
   for (const w of data.nouns.words) {
-    if (filters && filters.groups && filters.groups[w.group] === false) continue;
+    // Group check uses strict "must be true" semantics rather than "isn't
+    // explicitly false". The old "=== false" check let items slip through
+    // whenever the group filter was unchecked-but-absent (e.g. a word with a
+    // group ID not present in the filter map, or with no group at all),
+    // which is why unchecking every box still produced challenges.
+    if (filters && filters.groups && filters.groups[w.group] !== true) continue;
     for (const key of Object.keys(w.inflections || {})) {
       if (filters && filters.cases && filters.cases[key] === false) continue;
       pool.push({ word: w, key });
@@ -79,7 +94,8 @@ export function parseVerbKey(key) {
 export function buildVerbPool(data, filters) {
   const pool = [];
   for (const w of data.verbs.words) {
-    if (filters && filters.groups && filters.groups[w.group] === false) continue;
+    // Same "must be true" semantics as buildNounPool — see the note there.
+    if (filters && filters.groups && filters.groups[w.group] !== true) continue;
     for (const key of Object.keys(w.inflections || {})) {
       if (filters && !verbKeyAllowed(key, filters)) continue;
       pool.push({ word: w, key });

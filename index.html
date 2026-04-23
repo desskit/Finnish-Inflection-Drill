@@ -42,6 +42,17 @@
   </script>
 </head>
 <body>
+  <!-- Shown when the service worker detects a newer version is waiting to
+       activate. Clicking "Reload" sends SKIP_WAITING and refreshes the page
+       on controllerchange so the user doesn't have to discover the
+       double-refresh trick. -->
+  <div id="update-banner" class="update-banner hidden" role="status" aria-live="polite">
+    <span>A new version of the app is available.</span>
+    <button id="update-banner-reload" type="button" class="mini-btn">Reload</button>
+    <button id="update-banner-dismiss" type="button" class="update-banner-close"
+            aria-label="Dismiss">&times;</button>
+  </div>
+
   <main id="app">
     <header class="app-header">
       <h1>
@@ -243,6 +254,16 @@
         app.
       </p>
 
+      <h3>Privacy</h3>
+      <p>
+        All your drill statistics, settings, streak, SRS schedule, and
+        presets are stored locally in your browser &mdash; nothing is sent
+        to any server. The site does load anonymous usage analytics via
+        Google Analytics (no account, no personal data), which helps me see
+        rough traffic levels so I know the app is being used. If you'd
+        rather not be counted, any standard content blocker will silence it.
+      </p>
+
       <h3>Credits</h3>
       <p>
         Inspired by
@@ -353,6 +374,11 @@
           <input id="setting-haptic" type="checkbox" />
           <span class="group-label">Vibrate on wrong answer</span>
           <span class="group-example">short haptic buzz on mobile (ignored if unsupported)</span>
+        </label>
+        <label class="group-row">
+          <input id="setting-show-streak" type="checkbox" />
+          <span class="group-label">Show daily streak badge</span>
+          <span class="group-example">the little flame counter next to the app title &mdash; off by default, your streak is still tracked while hidden</span>
         </label>
         <p id="tts-warning" class="tts-warning hidden">
           No Finnish voice installed on this device &mdash; audio will be silent.

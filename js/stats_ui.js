@@ -1,7 +1,7 @@
 // Renders the stats panel — an overall summary plus per-dimension breakdowns.
 // Pure DOM, no framework.
 
-import { summarize, summarizeByWord, accuracy } from "./stats.js";
+import { summarize, summarizeByWord, accuracy, averageReviewsPerDay } from "./stats.js";
 import { nounLabel, verbLabel } from "./labels.js";
 
 // UI-only state for the per-word tables. Persists across re-renders (toggle
@@ -21,7 +21,8 @@ function fmtPct(a) {
   return `${Math.round(a * 100)}%`;
 }
 
-function overallLine(totals) {
+function overallLine(stats) {
+  const totals = stats.totals;
   const attempted = totals.correct + totals.wrong;
   const acc = attempted === 0 ? null : totals.correct / attempted;
   return (
@@ -29,6 +30,22 @@ function overallLine(totals) {
     ` (${fmtPct(acc)}) \u2022 ${totals.shown.toLocaleString()} shown \u2022` +
     ` ${totals.skipped.toLocaleString()} skipped`
   );
+}
+
+// Average-reviews-per-day sub-line. Kept on its own line so it doesn't crowd
+// the accuracy summary and so an empty value (early in the tracking window)
+// degrades gracefully.
+function averageLine(stats) {
+  const { value, days } = averageReviewsPerDay(stats);
+  if (value == null) {
+    // Before the first full day, there's no meaningful average to report.
+    // Keep the sentence so users know the stat exists and will populate.
+    return "Average reviews/day: \u2014 (tracking begins after 24 hours)";
+  }
+  // One decimal for < 10, whole number otherwise — keeps the number scannable
+  // without drowning a 42/day user in ".0".
+  const display = value < 10 ? value.toFixed(1) : Math.round(value).toLocaleString();
+  return `Average reviews/day: ${display} (over ${days.toLocaleString()} day${days === 1 ? "" : "s"})`;
 }
 
 function renderTable(rows, labelFor) {
@@ -277,8 +294,13 @@ export function renderStats(root, cfg, stats) {
 
   const overall = document.createElement("p");
   overall.className = "stats-overall";
-  overall.textContent = overallLine(stats.totals);
+  overall.textContent = overallLine(stats);
   root.appendChild(overall);
+
+  const avg = document.createElement("p");
+  avg.className = "stats-overall-sub";
+  avg.textContent = averageLine(stats);
+  root.appendChild(avg);
 
   // ----- noun breakdowns -----
   const nounWrap = document.createElement("div");

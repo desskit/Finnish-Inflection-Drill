@@ -451,6 +451,45 @@ kbd {
 .group-label   { color: var(--text); }
 .group-example { color: var(--muted); font-size: 0.85em; font-style: italic; }
 
+/* Update banner — fixed strip at the top of the viewport. Intentionally
+ * narrow on z-index budget (z: 50) so modal-style dialogs (confirm, prompt)
+ * still appear above it. */
+.update-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.8rem;
+  background: linear-gradient(180deg, var(--accent), var(--accent-soft));
+  color: var(--on-accent);
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.update-banner .mini-btn {
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--on-accent);
+  border-color: rgba(255, 255, 255, 0.35);
+  font-weight: 600;
+}
+.update-banner .mini-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+.update-banner-close {
+  background: transparent;
+  color: var(--on-accent);
+  border: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.2rem;
+  opacity: 0.75;
+}
+.update-banner-close:hover { opacity: 1; }
+
 /* Presets panel: list of saved filter configurations, per mode. Each row
  * has a name button (click = apply) and a small trash button on the right.
  * The whole row is a button, so the layout hugs tightly to the edges. */
@@ -800,7 +839,12 @@ kbd {
 .stats-overall {
   color: var(--text);
   font-size: 1rem;
-  margin: 0.95rem 0 1rem;
+  margin: 0.95rem 0 0.25rem;
+}
+.stats-overall-sub {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
 }
 .stats-group { margin-top: 1.2rem; }
 .stats-group h2 {

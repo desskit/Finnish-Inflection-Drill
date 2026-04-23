@@ -25,6 +25,10 @@ export function defaultSettings() {
                               // best rank is <= this value. Matches the cutoff
                               // used by scripts/extract.py at build time.
     theme:             "system", // "system" | "light" | "dark"
+    // Gamification is opt-in for new users. Existing users with a stored
+    // settings blob keep streak visibility via the migration below, so this
+    // default only applies to fresh installs.
+    showStreak:        false,
   };
 }
 
@@ -40,6 +44,13 @@ export function loadSettings() {
     merged.priorityMode = stored.weightedSampling ? "srs" : "uniform";
   }
   delete merged.weightedSampling;
+  // Streak-visibility migration: existing installs predate the toggle, so
+  // they had the streak badge on by default. Flipping the default to false
+  // for new users shouldn't silently hide it for people who were already
+  // counting their streak — presume "on" unless the user later opts out.
+  if (!Object.prototype.hasOwnProperty.call(stored, "showStreak")) {
+    merged.showStreak = true;
+  }
   return merged;
 }
 

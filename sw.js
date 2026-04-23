@@ -10,7 +10,7 @@
 // ⚠️ BUMP `CACHE_VERSION` whenever you ship app-shell changes that users need
 //    to pick up. Without a bump, they'll keep the old cached files forever.
 
-const CACHE_VERSION = "finnish-drill-v0.15";
+const CACHE_VERSION = "finnish-drill-v1.0";
 
 // Files required for the app to boot offline. Paths are relative so this
 // works under any base path (e.g. GitHub Pages project site).
@@ -70,6 +70,16 @@ self.addEventListener("activate", (event) => {
       )
     ).then(() => self.clients.claim())
   );
+});
+
+// Accept a skipWaiting nudge from the page. The page shows an "update
+// available" banner when it detects a new worker in the `waiting` state;
+// clicking the banner posts this message so we activate immediately instead
+// of waiting for every tab to close. The page then reloads on controllerchange.
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("fetch", (event) => {
