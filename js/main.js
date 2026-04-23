@@ -1032,7 +1032,8 @@ async function boot() {
       if (e.key === ";")     { e.preventDefault(); revealNextLetter();  return; }
       if (e.key === "-")     { e.preventDefault(); skipChallenge();     return; }
       if (e.key === ".")     { e.preventDefault(); showFullAnswer();    return; }
-      if (e.key === "'")     { e.preventDefault(); speakAnswer();       return; }
+      // No shortcut for speak-answer: Finnish uses ' in words like raa'an,
+      // so we must let the apostrophe key type. Click the Speak button instead.
     });
 
     setMode("noun");
