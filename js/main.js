@@ -764,6 +764,17 @@ function endBlitz() {
   const summary = recordBlitzRound(state.blitzStats, b.duration, b.score, b.bestCombo);
   saveBlitzStats(state.blitzStats);
 
+  // GA: one event per completed round. Matches the shape of test_complete
+  // so the two are comparable in reports. Same privacy budget as the drill
+  // events — counts only, no answer content.
+  track("blitz_complete", {
+    mode:       state.mode,
+    duration:   b.duration,
+    score:      b.score,
+    wrong:      b.wrong,
+    best_combo: b.bestCombo,
+  });
+
   // Populate the result modal.
   el.blitzResultScore.textContent = String(b.score);
   const total = b.score + b.wrong;
