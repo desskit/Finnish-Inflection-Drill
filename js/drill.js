@@ -36,7 +36,13 @@ export function buildNounPool(data, filters) {
     // which is why unchecking every box still produced challenges.
     if (filters && filters.groups && filters.groups[w.group] !== true) continue;
     for (const key of Object.keys(w.inflections || {})) {
-      if (filters && filters.cases && filters.cases[key] === false) continue;
+      // "Must be true" semantics — same reasoning as the group check above.
+      // Some inflection keys in the data (e.g. instructive_singular on words
+      // like `jalka`) don't have a matching checkbox in the UI because the
+      // case is marked plural_only in the config, so filters.cases[key] stays
+      // undefined. The old "=== false" test let those slip through; this
+      // ensures the pool mirrors the checkboxes exactly.
+      if (filters && filters.cases && filters.cases[key] !== true) continue;
       pool.push({ word: w, key });
     }
   }
@@ -106,10 +112,15 @@ export function buildVerbPool(data, filters) {
 
 function verbKeyAllowed(key, filters) {
   const p = parseVerbKey(key);
-  if (filters.tenses    && filters.tenses[p.tense]    === false) return false;
-  if (filters.voices    && p.voice    && filters.voices[p.voice]       === false) return false;
-  if (filters.polarities && p.polarity && filters.polarities[p.polarity] === false) return false;
-  if (filters.persons   && p.person   && filters.persons[p.person]     === false) return false;
+  // "Must be true" semantics across all four dimensions — see the notes in
+  // buildNounPool. The `p.voice && ...`-style guards are preserved because
+  // some parsed keys legitimately have no value for a dimension (e.g.
+  // participles have no polarity/person; infinitives have no person); in
+  // those cases we skip the check entirely rather than fail it.
+  if (filters.tenses    && filters.tenses[p.tense]    !== true) return false;
+  if (filters.voices    && p.voice    && filters.voices[p.voice]       !== true) return false;
+  if (filters.polarities && p.polarity && filters.polarities[p.polarity] !== true) return false;
+  if (filters.persons   && p.person   && filters.persons[p.person]     !== true) return false;
   return true;
 }
 
