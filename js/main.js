@@ -300,6 +300,25 @@ function updateStatus() {
   );
 }
 
+// ---------- analytics ----------
+// Thin wrapper around gtag. Captures drill-level events so I can see
+// engagement shape (are people answering? correct/wrong ratio? which mode?).
+// No answer content, no word IDs, no per-user state — just the two axes I
+// need for basic reporting: mode (noun/verb) and outcome.
+//
+// No-ops if gtag isn't available (content blocker, offline first-load, etc.),
+// so the drill never fails because analytics didn't load.
+function track(name, params) {
+  if (typeof gtag !== "function") return;
+  try { gtag("event", name, params || {}); }
+  catch { /* swallow — analytics must never break the drill */ }
+}
+
+// Session-level one-shot: fire once per page load when the user answers their
+// first challenge. Good retention signal ("of people who landed, how many
+// actually engaged?") without the volume of a per-answer event.
+let sessionFirstAnswerFired = false;
+
 // ---------- stats plumbing ----------
 function score(outcome) {
   // Only the first terminal outcome per challenge counts. Prevents double-
@@ -314,6 +333,17 @@ function score(outcome) {
   // neutral — we didn't learn anything about recall, so we don't want to
   // inflate or deflate stability for it.
   recordOutcomeToSchedule(outcome);
+
+  // GA: per-answer event with mode + outcome as params. Low-cardinality by
+  // design (4 outcomes × 2 modes = 8 shapes). Register `mode` and `outcome`
+  // as custom dimensions in GA4 admin if you want to filter the default
+  // reports by them — without that, params still land in Explorations /
+  // DebugView, just not the headline reports.
+  track("drill_answer", { mode: state.mode, outcome });
+  if (!sessionFirstAnswerFired) {
+    sessionFirstAnswerFired = true;
+    track("session_first_answer", { mode: state.mode });
+  }
 
   if (outcome === "correct") {
     const before = state.streak.current;
@@ -427,6 +457,7 @@ function startTest() {
   el.testRunning.classList.remove("hidden");
   el.testTotal.textContent = String(length);
   el.testCurrent.textContent = "1";
+  track("test_start", { mode: state.mode, length });
   newChallenge();
 }
 
@@ -451,6 +482,17 @@ function finishTest() {
   el.testRunning.classList.add("hidden");
   renderTestResults();
   el.testResults.classList.remove("hidden");
+  // GA: one event per completed test with aggregate outcome counts. Cheaper
+  // than a per-question event (per-question already goes through score()),
+  // and captures the "how did this attempt go" shape at test granularity.
+  const r = state.test.results;
+  const correct = r.filter((x) => x.outcome === "correct").length;
+  track("test_complete", {
+    mode:     state.mode,
+    length:   r.length,
+    correct,
+    accuracy: r.length ? Math.round(100 * correct / r.length) : 0,
+  });
   // Leave the drill challenge on screen too so they can keep drilling if
   // they want; the idle controls stay hidden until "Dismiss" is clicked.
 }
