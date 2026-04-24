@@ -23,6 +23,9 @@ import {
 import { speak, ttsAvailable, cancelSpeech } from "./tts.js";
 import { applyTheme, watchSystemTheme } from "./theme.js";
 import { loadStreak, saveStreak, recordCorrect as bumpStreak, checkExpired as checkStreakExpired } from "./streak.js";
+import {
+  loadBlitzStats, saveBlitzStats, recordBlitzRound, bestScoreAt, BLITZ_DURATIONS,
+} from "./blitz.js";
 import { APP_VERSION } from "./version.js";
 
 // Export-file schema version. Bumped only when the shape of the export
@@ -57,6 +60,23 @@ const state = {
   // When `finished` is true, the results panel is on screen and new submits
   // don't affect the test.
   test: null,
+  // Blitz mode: null when idle, otherwise the active round. Mutually
+  // exclusive with test mode — we reject starting blitz while a test is
+  // running (and vice versa) so the two loops never overlap.
+  // Shape:
+  //   {
+  //     active: bool, duration: 30|60|120, endAt: ms epoch,
+  //     score: int, wrong: int, combo: int, bestCombo: int,
+  //     timerId: setInterval handle,
+  //     wrongFlashUntil: ms epoch | 0  (blocks submits while a wrong-answer
+  //                                     flash is on screen, so a fast typer
+  //                                     can't double-submit through it),
+  //   }
+  blitz: null,
+  // Persistent blitz stats (best score/combo per duration, total rounds).
+  // Separate storage key from drill stats so resetting one doesn't nuke the
+  // other.
+  blitzStats: null,
 };
 
 // ---------- DOM refs ----------
@@ -119,6 +139,27 @@ const el = {
   testTotal:       document.getElementById("test-total"),
   testStart:       document.getElementById("test-start"),
   testCancel:      document.getElementById("test-cancel"),
+  // Blitz mode
+  blitzOpen:       document.getElementById("blitz-open"),
+  blitzHud:        document.getElementById("blitz-hud"),
+  blitzTimerBar:   document.getElementById("blitz-timer-bar"),
+  blitzTime:       document.getElementById("blitz-time"),
+  blitzScore:      document.getElementById("blitz-score"),
+  blitzCombo:      document.getElementById("blitz-combo"),
+  blitzStartModal: document.getElementById("blitz-start"),
+  blitzDurationPicker: document.getElementById("blitz-duration-picker"),
+  blitzStartBest:  document.getElementById("blitz-start-best"),
+  blitzStartCancel:document.getElementById("blitz-start-cancel"),
+  blitzStartGo:    document.getElementById("blitz-start-go"),
+  blitzResultModal:document.getElementById("blitz-result"),
+  blitzResultScore:document.getElementById("blitz-result-score"),
+  blitzResultDetail:document.getElementById("blitz-result-detail"),
+  blitzResultBest: document.getElementById("blitz-result-best"),
+  blitzResultShare:document.getElementById("blitz-result-share"),
+  blitzResultAgain:document.getElementById("blitz-result-again"),
+  blitzResultDone: document.getElementById("blitz-result-done"),
+  blitzShareFeedback: document.getElementById("blitz-share-feedback"),
+  settingShowBlitz:document.getElementById("setting-show-blitz"),
 };
 
 // ---------- rendering ----------
@@ -496,6 +537,295 @@ function testActive() {
   return state.test && !state.test.finished;
 }
 
+// ---------- blitz mode ----------
+// Timed sprint round. The drill chrome (hint row) hides, a HUD with timer bar
+// and score slides in above the challenge, and each submit becomes a tight
+// correct/wrong loop with no SRS/stats side effects. Timer is authoritative
+// off Date.now() rather than a tick counter so a paused/throttled tab that
+// comes back late just ends the round, not drifts.
+
+function blitzActive() {
+  return !!(state.blitz && state.blitz.active);
+}
+
+function openBlitzModal() {
+  if (state.pool.length === 0) {
+    setStatus("No challenges in the current pool — enable a filter first.");
+    return;
+  }
+  if (testActive()) {
+    alert("Finish or cancel the current test before starting a Blitz round.");
+    return;
+  }
+  // Pre-select the user's last-used duration (or 60 as the default).
+  const d = state.settings.blitzDuration || 60;
+  setBlitzDurationSelection(d);
+  renderBlitzStartBest(d);
+  el.blitzStartModal.classList.remove("hidden");
+}
+
+function closeBlitzStartModal() {
+  el.blitzStartModal.classList.add("hidden");
+}
+
+function setBlitzDurationSelection(duration) {
+  for (const btn of el.blitzDurationPicker.querySelectorAll(".seg-btn")) {
+    const active = Number(btn.dataset.duration) === duration;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-checked", active ? "true" : "false");
+  }
+  state.settings.blitzDuration = duration;
+}
+
+function renderBlitzStartBest(duration) {
+  const best = bestScoreAt(state.blitzStats, duration);
+  el.blitzStartBest.textContent = best === null
+    ? "No personal best yet at this length."
+    : `Personal best: ${best} at ${duration}s.`;
+}
+
+function startBlitz() {
+  const duration = state.settings.blitzDuration || 60;
+  saveSettings(state.settings);
+  closeBlitzStartModal();
+
+  // Cancel any in-flight speech from a previous challenge — blitz has no
+  // audio, and we don't want a stale TTS utterance trailing into the round.
+  cancelSpeech();
+
+  state.blitz = {
+    active: true,
+    duration,
+    endAt: Date.now() + duration * 1000,
+    score: 0,
+    wrong: 0,
+    combo: 0,
+    bestCombo: 0,
+    timerId: null,
+    wrongFlashUntil: 0,
+  };
+
+  // Chrome swap: hide hints/speak, show HUD. The answer input and headword
+  // stay put — blitz reuses the same drill plumbing.
+  document.body.classList.add("blitz-mode");
+  el.blitzHud.classList.remove("hidden");
+  updateBlitzHud();
+
+  // First challenge: force uniform sampling regardless of priorityMode.
+  // SRS bias ("here's your 5 worst words") feels wrong at sprint pace —
+  // blitz should be a grab-bag from the whole pool.
+  newBlitzChallenge();
+
+  state.blitz.timerId = setInterval(blitzTick, 100);
+  el.answer.focus();
+}
+
+function newBlitzChallenge() {
+  cancelSpeech();
+  state.current = nextChallenge(state.pool, state.current, {
+    priority: "uniform",
+    mode:     state.mode,
+    now:      Date.now(),
+  });
+  state.awaitingNext = false;
+  state.hintsShown = 0;
+  state.scoredThisChallenge = false;
+  el.answer.value = "";
+  setFeedback("");
+  el.answer.classList.remove("blitz-flash-ok", "blitz-flash-bad");
+  if (state.current) render();
+  if (state.view === "drill") el.answer.focus();
+}
+
+function blitzTick() {
+  if (!blitzActive()) return;
+  const now = Date.now();
+  const remaining = Math.max(0, state.blitz.endAt - now);
+  if (remaining <= 0) { endBlitz(); return; }
+  updateBlitzHud(remaining);
+}
+
+function updateBlitzHud(remainingMs) {
+  const remaining = remainingMs !== undefined
+    ? remainingMs
+    : Math.max(0, state.blitz.endAt - Date.now());
+  const totalMs = state.blitz.duration * 1000;
+  const pct = Math.max(0, Math.min(100, (remaining / totalMs) * 100));
+  el.blitzTimerBar.style.width = `${pct}%`;
+  el.blitzTimerBar.classList.toggle("urgent", pct <= 20);
+
+  const secs = Math.ceil(remaining / 1000);
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  el.blitzTime.textContent = `${m}:${s < 10 ? "0" : ""}${s}`;
+
+  el.blitzScore.textContent = String(state.blitz.score);
+
+  const combo = state.blitz.combo;
+  if (combo >= 2) {
+    el.blitzCombo.textContent = `combo \u00D7${combo}${combo >= 5 ? " \uD83D\uDD25" : ""}`;
+    el.blitzCombo.classList.add("active");
+  } else {
+    el.blitzCombo.textContent = "";
+    el.blitzCombo.classList.remove("active");
+  }
+}
+
+function blitzSubmit() {
+  const b = state.blitz;
+  if (!b || !b.active) return;
+  // Block re-entry while a wrong-answer flash is on screen — prevents a
+  // hammering typer from submitting the next card's blank input as "wrong".
+  if (b.wrongFlashUntil && Date.now() < b.wrongFlashUntil) return;
+  const input = el.answer.value;
+  if (!input.trim()) return;
+  const result = checkAnswer(state.current, input);
+  if (result.ok) {
+    b.score += 1;
+    b.combo += 1;
+    if (b.combo > b.bestCombo) b.bestCombo = b.combo;
+    // Quick green flash on the input, then straight to the next card. No
+    // TTS, no setTimeout chain — every ms matters at sprint pace.
+    el.answer.classList.add("blitz-flash-ok");
+    updateBlitzHud();
+    newBlitzChallenge();
+  } else {
+    b.wrong += 1;
+    b.combo = 0;
+    // Show the correct form briefly so the user learns something, then
+    // advance. 800ms is short enough not to feel punitive but long enough
+    // to actually read on mobile.
+    const expected = result.expected;
+    setFeedback(`\u2717 was: ${expected}`, "bad");
+    el.answer.classList.add("blitz-flash-bad");
+    buzzIfWrong();
+    b.wrongFlashUntil = Date.now() + 800;
+    updateBlitzHud();
+    setTimeout(() => {
+      if (!blitzActive()) return; // round may have ended during the flash
+      newBlitzChallenge();
+    }, 800);
+  }
+}
+
+function endBlitz() {
+  const b = state.blitz;
+  if (!b) return;
+  clearInterval(b.timerId);
+  b.active = false;
+
+  document.body.classList.remove("blitz-mode");
+  el.blitzHud.classList.add("hidden");
+  el.answer.classList.remove("blitz-flash-ok", "blitz-flash-bad");
+  setFeedback("");
+
+  const summary = recordBlitzRound(state.blitzStats, b.duration, b.score, b.bestCombo);
+  saveBlitzStats(state.blitzStats);
+
+  // Populate the result modal.
+  el.blitzResultScore.textContent = String(b.score);
+  const total = b.score + b.wrong;
+  const pct = total === 0 ? 0 : Math.round(100 * b.score / total);
+  el.blitzResultDetail.textContent =
+    `${b.score} correct \u00B7 ${b.wrong} wrong \u00B7 ` +
+    `${pct}% accuracy \u00B7 best combo \u00D7${b.bestCombo}`;
+
+  const parts = [];
+  if (summary.isPersonalBestScore && summary.previousBestScore !== null) {
+    parts.push(`\uD83C\uDFC6 New best score! (was ${summary.previousBestScore})`);
+  } else if (summary.isPersonalBestScore) {
+    parts.push("\uD83C\uDFC6 First round at this length!");
+  } else if (summary.previousBestScore !== null) {
+    parts.push(`personal best ${summary.previousBestScore}`);
+  }
+  if (summary.isPersonalBestCombo && summary.previousBestCombo !== null && b.bestCombo > 0) {
+    parts.push(`new combo best (was \u00D7${summary.previousBestCombo})`);
+  }
+  el.blitzResultBest.textContent = parts.join(" \u00B7 ");
+
+  el.blitzShareFeedback.textContent = "";
+  el.blitzResultModal.classList.remove("hidden");
+}
+
+function cancelBlitz() {
+  const b = state.blitz;
+  if (!b) return;
+  clearInterval(b.timerId);
+  b.active = false;
+  state.blitz = null;
+  document.body.classList.remove("blitz-mode");
+  el.blitzHud.classList.add("hidden");
+  el.answer.classList.remove("blitz-flash-ok", "blitz-flash-bad");
+}
+
+function shareBlitzResult() {
+  const b = state.blitz;
+  if (!b) return;
+  const total = b.score + b.wrong;
+  const pct = total === 0 ? 0 : Math.round(100 * b.score / total);
+  const text =
+    `\uD83C\uDDEB\uD83C\uDDEE Finnish Drill — Blitz, ${b.duration}s\n` +
+    `\u2705 ${b.score} correct / ${b.wrong} wrong (${pct}%)\n` +
+    `\uD83D\uDD25 best combo \u00D7${b.bestCombo}\n` +
+    `https://desskit.github.io/Finnish-Inflection-Drill/`;
+  // Clipboard API needs a secure context; fall back to a hidden textarea for
+  // older browsers / file://. Either way, show a confirmation line so the
+  // user knows the copy happened.
+  const done = () => {
+    el.blitzShareFeedback.textContent = "Copied to clipboard.";
+    setTimeout(() => {
+      if (el.blitzShareFeedback) el.blitzShareFeedback.textContent = "";
+    }, 2500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, onDone) {
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    onDone();
+  } catch {
+    el.blitzShareFeedback.textContent = "Couldn't copy automatically — please copy the score manually.";
+  }
+}
+
+function closeBlitzResult() {
+  el.blitzResultModal.classList.add("hidden");
+  state.blitz = null;
+  // Drop the user back into a fresh regular challenge so the drill UI is
+  // usable again without a manual tab switch. Pool may have shifted under
+  // us if filters changed between rounds (they can't, modals are modal,
+  // but belt + braces).
+  newChallenge();
+}
+
+function playBlitzAgain() {
+  const duration = (state.blitz && state.blitz.duration) || state.settings.blitzDuration || 60;
+  el.blitzResultModal.classList.add("hidden");
+  state.blitz = null;
+  state.settings.blitzDuration = duration;
+  startBlitz();
+}
+
+// Apply the settings.showBlitz toggle to the launch button visibility. Kept
+// as a helper because it's hit from both boot and the settings change event.
+function applyShowBlitz() {
+  if (!el.blitzOpen) return;
+  const show = state.settings && state.settings.showBlitz !== false;
+  el.blitzOpen.classList.toggle("hidden", !show);
+}
+
 // ---------- drill flow ----------
 // `opts.suppressFocus` skips the answer-input focus step at the end. Callers
 // triggered by user edits to the filter grid / presets / etc. pass true:
@@ -536,6 +866,16 @@ function newChallenge(opts) {
 
 function submit() {
   if (!state.current) return;
+
+  // Blitz has its own submit path: no SRS, no drill stats, no streak bump,
+  // no TTS chain. Handled entirely inside blitzSubmit().
+  if (blitzActive()) { blitzSubmit(); return; }
+
+  // Dead zone between a blitz round ending and the user dismissing the
+  // result modal. state.current may still be set, and without this guard
+  // an Enter press would fall through to the normal drill submit path and
+  // score a challenge the user never actually intended to answer.
+  if (state.blitz && !state.blitz.active) return;
 
   // In an active test we run a tighter loop: silent feedback, record,
   // immediate advance. Stats still update via score().
@@ -596,6 +936,7 @@ function buzzIfWrong() {
 
 function revealNextLetter() {
   if (!state.current || state.awaitingNext) return;
+  if (blitzActive()) return;   // hints disabled during blitz
   const expected = state.current.word.inflections[state.current.key];
   if (state.hintsShown >= expected.length) return;
   state.hintsShown++;
@@ -607,6 +948,7 @@ function revealNextLetter() {
 
 function showFullAnswer() {
   if (!state.current) return;
+  if (blitzActive()) return;   // hints disabled during blitz
   if (testActive()) {
     score("shown");
     recordTestAnswer("shown", el.answer.value);
@@ -623,6 +965,7 @@ function showFullAnswer() {
 
 function skipChallenge() {
   if (!state.current) return;
+  if (blitzActive()) return;   // skip disabled during blitz
   if (testActive()) {
     score("skipped");
     recordTestAnswer("skipped", el.answer.value);
@@ -710,6 +1053,11 @@ function setMode(mode) {
   if (changed && testActive()) {
     if (!confirm("Switching mode will cancel the current test. Continue?")) return;
     cancelTest();
+  }
+  // Same story for blitz — mid-round mode switch invalidates the pool.
+  if (changed && blitzActive()) {
+    if (!confirm("Switching mode will cancel the current Blitz round. Continue?")) return;
+    cancelBlitz();
   }
   state.mode = mode;
   setView("drill");
@@ -849,6 +1197,7 @@ async function boot() {
     state.streak      = checkStreakExpired(loadStreak());
     saveStreak(state.streak); // persist any expiry reset immediately
     renderStreak();
+    state.blitzStats  = loadBlitzStats();
 
     // Theme: the inline script in <head> already applied the persisted value
     // pre-paint. Here we just sync the segmented control and subscribe to OS
@@ -941,6 +1290,18 @@ async function boot() {
       renderStreak();
     });
 
+    // Blitz visibility — the launch button can be hidden entirely for users
+    // who aren't interested in gamified layers. Default is on (unlike streak,
+    // which is passive and always visible) because the button is inert until
+    // clicked.
+    el.settingShowBlitz.checked = state.settings.showBlitz !== false;
+    applyShowBlitz();
+    el.settingShowBlitz.addEventListener("change", () => {
+      state.settings.showBlitz = el.settingShowBlitz.checked;
+      saveSettings(state.settings);
+      applyShowBlitz();
+    });
+
     // Frequency cap — select reflects saved value; change rebuilds the pool.
     el.settingFreqCap.value = String(state.settings.frequencyCap);
     el.settingFreqCap.addEventListener("change", () => {
@@ -999,8 +1360,22 @@ async function boot() {
 
     el.modeNoun.addEventListener("click",    () => setMode("noun"));
     el.modeVerb.addEventListener("click",    () => setMode("verb"));
-    el.modeOptions.addEventListener("click", () => setView("options"));
-    el.modeAbout.addEventListener("click",   () => setView("about"));
+    // Leaving the drill view during an active blitz round would orphan the
+    // timer. Confirm and cancel the round if the user wanders off mid-sprint.
+    el.modeOptions.addEventListener("click", () => {
+      if (blitzActive()) {
+        if (!confirm("Leaving the drill will cancel the current Blitz round. Continue?")) return;
+        cancelBlitz();
+      }
+      setView("options");
+    });
+    el.modeAbout.addEventListener("click",   () => {
+      if (blitzActive()) {
+        if (!confirm("Leaving the drill will cancel the current Blitz round. Continue?")) return;
+        cancelBlitz();
+      }
+      setView("about");
+    });
 
     // Theme segmented control
     el.themeSwitch.addEventListener("click", (e) => {
@@ -1026,6 +1401,45 @@ async function boot() {
     el.hintLetter.addEventListener("click", revealNextLetter);
     el.hintAnswer.addEventListener("click", showFullAnswer);
     el.skip.addEventListener("click", skipChallenge);
+
+    // Blitz: launch button + duration picker + start/cancel + result actions.
+    el.blitzOpen.addEventListener("click", openBlitzModal);
+    el.blitzDurationPicker.addEventListener("click", (e) => {
+      const btn = e.target.closest(".seg-btn");
+      if (!btn) return;
+      const d = Number(btn.dataset.duration);
+      if (!BLITZ_DURATIONS.includes(d)) return;
+      setBlitzDurationSelection(d);
+      renderBlitzStartBest(d);
+    });
+    el.blitzStartCancel.addEventListener("click", closeBlitzStartModal);
+    el.blitzStartGo.addEventListener("click", startBlitz);
+    // Clicking the modal backdrop (but not the inner card) also cancels.
+    el.blitzStartModal.addEventListener("click", (e) => {
+      if (e.target === el.blitzStartModal) closeBlitzStartModal();
+    });
+
+    el.blitzResultShare.addEventListener("click", shareBlitzResult);
+    el.blitzResultAgain.addEventListener("click", playBlitzAgain);
+    el.blitzResultDone.addEventListener("click", closeBlitzResult);
+    el.blitzResultModal.addEventListener("click", (e) => {
+      if (e.target === el.blitzResultModal) closeBlitzResult();
+    });
+
+    // Keyboard: Esc cancels the start modal; during an active round it
+    // cancels the round entirely. Not bound to Enter inside the start modal
+    // because the answer input already eats Enter as submit, and we don't
+    // want the picker to steal focus from there.
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      if (!el.blitzStartModal.classList.contains("hidden")) {
+        closeBlitzStartModal();
+      } else if (blitzActive()) {
+        if (confirm("Cancel the current Blitz round?")) cancelBlitz();
+      } else if (!el.blitzResultModal.classList.contains("hidden")) {
+        closeBlitzResult();
+      }
+    });
 
     el.answer.addEventListener("keydown", (e) => {
       if (e.key === "Enter") { e.preventDefault(); submit();            return; }
@@ -1117,6 +1531,8 @@ async function importStats(file) {
       el.settingSrsCap.value        = state.settings.srsCap;
       el.settingHaptic.checked      = state.settings.hapticFeedback;
       el.settingShowStreak.checked  = state.settings.showStreak;
+      el.settingShowBlitz.checked   = state.settings.showBlitz !== false;
+      applyShowBlitz();
       el.settingFreqCap.value       = String(state.settings.frequencyCap);
       el.testLength.value           = String(state.settings.testLength);
       renderPrioritySwitch();

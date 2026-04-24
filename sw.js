@@ -31,6 +31,7 @@ const PRECACHE = [
   "./js/stats.js",
   "./js/stats_ui.js",
   "./js/srs.js",
+  "./js/blitz.js",
   "./js/tts.js",
   "./js/theme.js",
   "./js/streak.js",

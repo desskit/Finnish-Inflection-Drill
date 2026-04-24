@@ -490,6 +490,187 @@ kbd {
 }
 .update-banner-close:hover { opacity: 1; }
 
+/* ------------------------------------------------------------------ */
+/* Blitz mode — timed sprint rounds.                                   */
+/*                                                                     */
+/* Three moving parts:                                                  */
+/*   .blitz-btn      — the launch button in the hint row               */
+/*   .blitz-hud      — the timer bar + score strip shown during a round */
+/*   .blitz-modal    — pre-round and post-round overlay dialogs        */
+/*                                                                     */
+/* The hud replaces the hint row during an active round (via .hidden   */
+/* toggles in JS) so the user has no distractions and no extra chrome. */
+/* ------------------------------------------------------------------ */
+
+/* Launch button — same shape as .hint-btn but with an accent stroke and
+ * a subtle glow so it reads as the special action in the row. */
+.hint-btn.blitz-btn {
+  border-color: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.hint-btn.blitz-btn:hover {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-glow);
+}
+.hint-btn.blitz-btn:disabled {
+  /* Inherit the hint-btn disabled state; just remove the accent treatment
+   * so a disabled Blitz button doesn't still look inviting. */
+  border-color: var(--border);
+  color: var(--muted);
+  box-shadow: none;
+  background: transparent;
+}
+
+/* In-round HUD: timer bar on top, a single row with time / score / combo.
+ * Padding matches .panel so it docks flush with the challenge card above. */
+.blitz-hud {
+  padding: 0.65rem 1rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.blitz-timer {
+  height: 6px;
+  width: 100%;
+  background: var(--panel-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.blitz-timer-bar {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-soft) 100%);
+  transition: width 100ms linear;
+  will-change: width;
+}
+/* Turn the bar red once the round enters its last 20% of time; cheaper
+ * signal than a dedicated "urgency" animation, and the gradient keeps it
+ * readable in both themes. */
+.blitz-timer-bar.urgent {
+  background: linear-gradient(90deg, var(--danger) 0%, #c13f3f 100%);
+}
+.blitz-hud-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.55rem;
+  font-variant-numeric: tabular-nums;
+}
+.blitz-time {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 3.5ch;
+}
+.blitz-score-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+.blitz-score-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.blitz-score {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+.blitz-combo {
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  min-width: 6ch;
+  text-align: right;
+}
+.blitz-combo.active { color: var(--accent); font-weight: 600; }
+
+/* Transient feedback flash on the answer input during blitz. Much shorter
+ * and quieter than the normal feedback line — a full-row color bath would
+ * feel panicky at sprint pace. */
+.blitz-flash-ok  { box-shadow: 0 0 0 2px var(--ok)     inset; transition: box-shadow 120ms; }
+.blitz-flash-bad { box-shadow: 0 0 0 2px var(--danger) inset; transition: box-shadow 120ms; }
+
+/* Pre- and post-round overlays. Backdrop dims the app; the modal centers
+ * and uses panel styling so it feels native to the site. */
+.blitz-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 60;
+}
+.blitz-modal-inner {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 1.5rem;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+.blitz-modal-inner h2 { margin: 0 0 0.5rem; font-size: 1.4rem; }
+.blitz-modal-inner p  { color: var(--text-dim); margin: 0.4rem 0; line-height: 1.45; }
+
+.blitz-duration-picker {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 1rem 0 0.75rem;
+}
+.blitz-duration-picker .seg-btn {
+  min-width: 3.5rem;
+}
+
+.blitz-start-best {
+  color: var(--muted);
+  font-size: 0.85rem;
+  min-height: 1.1em;   /* reserve space so the modal doesn't reflow */
+}
+
+.blitz-modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Post-round summary: giant number so the result is the hero of the screen. */
+.blitz-result-score {
+  font-size: 4.5rem;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+  margin: 0.8rem 0 0.3rem;
+  font-variant-numeric: tabular-nums;
+}
+.blitz-result-detail { color: var(--text-dim); margin: 0.2rem 0 0.6rem; }
+.blitz-result-best   {
+  color: var(--ok);
+  font-weight: 600;
+  min-height: 1.2em;   /* reserve space when it's not a PB */
+  margin: 0.3rem 0 0;
+}
+.blitz-share-feedback {
+  color: var(--muted);
+  font-size: 0.85rem;
+  min-height: 1.1em;
+  margin: 0.6rem 0 0;
+}
+
 /* Presets panel: list of saved filter configurations, per mode. Each row
  * has a name button (click = apply) and a small trash button on the right.
  * The whole row is a button, so the layout hugs tightly to the edges. */
