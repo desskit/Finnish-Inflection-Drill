@@ -96,8 +96,68 @@
         <button id="speak-answer" type="button" class="hint-btn" title="Hear the answer">
           Speak
         </button>
+        <button id="blitz-open" type="button" class="hint-btn blitz-btn"
+                title="Timed sprint — score as many correct as you can">
+          &#9889; Blitz
+        </button>
       </div>
     </section>
+
+    <!-- Blitz HUD: shown only during an active blitz round. Sits above the
+         challenge card so the timer is always visible without displacing any
+         existing layout. -->
+    <section id="blitz-hud" class="blitz-hud hidden" aria-live="polite">
+      <div class="blitz-timer">
+        <div id="blitz-timer-bar" class="blitz-timer-bar"></div>
+      </div>
+      <div class="blitz-hud-row">
+        <span id="blitz-time" class="blitz-time">0:60</span>
+        <span class="blitz-score-wrap">
+          <span class="blitz-score-label">Score</span>
+          <span id="blitz-score" class="blitz-score">0</span>
+        </span>
+        <span id="blitz-combo" class="blitz-combo"></span>
+      </div>
+    </section>
+
+    <!-- Blitz pre-round modal: duration picker + Start button. Shown on Blitz
+         button click; dismissed by Cancel, Start, or clicking the backdrop. -->
+    <div id="blitz-start" class="blitz-modal hidden" role="dialog" aria-labelledby="blitz-start-title" aria-modal="true">
+      <div class="blitz-modal-inner">
+        <h2 id="blitz-start-title">&#9889; Blitz</h2>
+        <p>
+          Score as many correct as you can before the timer runs out. No hints.
+          Wrong answers show the right one and move on.
+        </p>
+        <div class="blitz-duration-picker" id="blitz-duration-picker" role="radiogroup" aria-label="Round length">
+          <button type="button" class="seg-btn" data-duration="30"  role="radio">30s</button>
+          <button type="button" class="seg-btn" data-duration="60"  role="radio">60s</button>
+          <button type="button" class="seg-btn" data-duration="120" role="radio">120s</button>
+        </div>
+        <p id="blitz-start-best" class="blitz-start-best"></p>
+        <div class="blitz-modal-actions">
+          <button id="blitz-start-cancel" type="button" class="mini-btn">Cancel</button>
+          <button id="blitz-start-go"     type="button" class="mode-btn">Start</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Blitz result modal: shown when the timer runs out. Share button
+         copies a text block to clipboard for Discord. -->
+    <div id="blitz-result" class="blitz-modal hidden" role="dialog" aria-labelledby="blitz-result-title" aria-modal="true">
+      <div class="blitz-modal-inner">
+        <h2 id="blitz-result-title">&#9889; Blitz complete</h2>
+        <div class="blitz-result-score" id="blitz-result-score">0</div>
+        <p id="blitz-result-detail" class="blitz-result-detail"></p>
+        <p id="blitz-result-best" class="blitz-result-best"></p>
+        <div class="blitz-modal-actions">
+          <button id="blitz-result-share" type="button" class="mini-btn">Share</button>
+          <button id="blitz-result-again" type="button" class="mini-btn">Play again</button>
+          <button id="blitz-result-done"  type="button" class="mode-btn">Done</button>
+        </div>
+        <p id="blitz-share-feedback" class="blitz-share-feedback"></p>
+      </div>
+    </div>
 
     <section id="filters-noun" class="panel filters hidden" aria-label="Noun filters"></section>
     <section id="filters-verb" class="panel filters hidden" aria-label="Verb filters"></section>
@@ -165,6 +225,22 @@
         Set a number of questions and the app runs them back-to-back without
         showing whether each one was right. At the end you get accuracy plus a
         review list of anything you missed. Statistics still update normally.
+      </p>
+
+      <h3>Blitz mode</h3>
+      <p>
+        Click the <strong>&#9889;&nbsp;Blitz</strong> button under the drill
+        for a timed sprint round (30, 60, or 120 seconds). No hints, no skip
+        &mdash; wrong answers flash the correct form briefly and move on. A
+        Share button on the result screen copies a score summary to your
+        clipboard so you can paste it in Discord.
+      </p>
+      <p>
+        Blitz rounds are deliberately isolated: they don't feed the spaced
+        repetition schedule, don't touch your drill statistics, and don't
+        count toward your daily streak. It's for fun and bragging rights, not
+        learning pressure. Personal bests per duration are tracked separately.
+        Hide the button entirely via <em>Options &rarr; Feedback</em>.
       </p>
 
       <h3>Options</h3>
@@ -384,6 +460,11 @@
           <input id="setting-show-streak" type="checkbox" />
           <span class="group-label">Show daily streak badge</span>
           <span class="group-example">the little flame counter next to the app title &mdash; off by default, your streak is still tracked while hidden</span>
+        </label>
+        <label class="group-row">
+          <input id="setting-show-blitz" type="checkbox" />
+          <span class="group-label">Show Blitz button</span>
+          <span class="group-example">a timed sprint round under the drill &mdash; turn off to hide the button entirely</span>
         </label>
         <p id="tts-warning" class="tts-warning hidden">
           No Finnish voice installed on this device &mdash; audio will be silent.

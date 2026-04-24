@@ -29,6 +29,13 @@ export function defaultSettings() {
     // settings blob keep streak visibility via the migration below, so this
     // default only applies to fresh installs.
     showStreak:        false,
+    // Blitz mode (timed sprint round). Unlike the streak badge, this is a
+    // button the user has to click to engage with, so defaulting it on is
+    // low-friction — hidden only if you explicitly opt out.
+    showBlitz:         true,
+    // Last duration the user picked in the blitz start modal. Preserved so
+    // repeat rounds don't require re-clicking the same chip every time.
+    blitzDuration:     60,
   };
 }
 
