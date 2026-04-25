@@ -502,25 +502,16 @@ kbd {
 /* toggles in JS) so the user has no distractions and no extra chrome. */
 /* ------------------------------------------------------------------ */
 
-/* Launch button — same shape as .hint-btn but with an accent stroke and
- * a subtle glow so it reads as the special action in the row. */
-.hint-btn.blitz-btn {
-  border-color: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 600;
-}
-.hint-btn.blitz-btn:hover {
-  background: var(--accent-wash);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent-glow);
-}
-.hint-btn.blitz-btn:disabled {
-  /* Inherit the hint-btn disabled state; just remove the accent treatment
-   * so a disabled Blitz button doesn't still look inviting. */
-  border-color: var(--border);
-  color: var(--muted);
-  box-shadow: none;
-  background: transparent;
+/* Launch buttons (Test, Blitz) — visually identical to other hint buttons.
+ * They get a small left margin so they sit a little away from the hint
+ * group (Next letter / Show answer / Skip / Speak), reading as a separate
+ * "mode" cluster rather than another hint. The first of the two carries
+ * the gap; the second hugs it via the standard .hint-row gap. */
+.hint-btn.test-btn  { margin-left: 0.6rem; }
+@media (max-width: 520px) {
+  /* On narrow screens the row wraps; collapse the spacer so the cluster
+   * doesn't get pushed to a stranded right-aligned line. */
+  .hint-btn.test-btn { margin-left: 0; }
 }
 
 /* In-round HUD: timer bar on top, a single row with time / score / combo.
@@ -600,8 +591,11 @@ kbd {
 .blitz-flash-bad { box-shadow: 0 0 0 2px var(--danger) inset; transition: box-shadow 120ms; }
 
 /* Pre- and post-round overlays. Backdrop dims the app; the modal centers
- * and uses panel styling so it feels native to the site. */
-.blitz-modal {
+ * and uses panel styling so it feels native to the site. Shared between
+ * Blitz (.blitz-modal) and Test mode (.test-modal) — same chrome, different
+ * payload. */
+.blitz-modal,
+.test-modal {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.55);
@@ -611,7 +605,8 @@ kbd {
   padding: 1rem;
   z-index: 60;
 }
-.blitz-modal-inner {
+.blitz-modal-inner,
+.test-modal-inner {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -620,9 +615,23 @@ kbd {
   max-width: 420px;
   width: 100%;
   text-align: center;
+  /* Keep tall result lists scrollable rather than overflowing the viewport. */
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
 }
-.blitz-modal-inner h2 { margin: 0 0 0.5rem; font-size: 1.4rem; }
-.blitz-modal-inner p  { color: var(--text-dim); margin: 0.4rem 0; line-height: 1.45; }
+.blitz-modal-inner h2,
+.test-modal-inner h2 { margin: 0 0 0.5rem; font-size: 1.4rem; }
+.blitz-modal-inner p,
+.test-modal-inner p  { color: var(--text-dim); margin: 0.4rem 0; line-height: 1.45; }
+.test-modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+/* The wider review list reads better when left-aligned inside the centered card. */
+.test-modal-inner .wrong-list { text-align: left; }
 
 .blitz-duration-picker {
   display: flex;
@@ -868,14 +877,12 @@ kbd {
 }
 
 /* ---------- Test mode ---------- */
-.test-controls { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.test-controls label {
-  color: var(--text);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-.test-progress {
+/* In-progress strip shown above the challenge while a test is running.
+ * Mirrors the role of .blitz-hud — a thin always-visible reminder of what
+ * mode you're in plus a Cancel escape hatch. Idle and result states live in
+ * .test-modal overlays, so there's no panel chrome here when no test is
+ * active (the section is .hidden in that case). */
+.test-hud {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -884,9 +891,23 @@ kbd {
   font-size: 1rem;
   font-weight: 500;
   padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
   background: var(--accent-wash);
   border: 1px solid var(--accent-glow);
   border-radius: var(--radius);
+}
+.test-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.test-controls label {
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 .test-results { color: var(--text); }
 .test-results h3 {

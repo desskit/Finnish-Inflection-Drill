@@ -130,15 +130,22 @@ const el = {
   streakBadge:     document.getElementById("streak-badge"),
   appVersion:      document.getElementById("app-version"),
   aboutVersion:    document.getElementById("about-version"),
-  testPanel:       document.getElementById("test-panel"),
-  testIdle:        document.getElementById("test-idle"),
-  testRunning:     document.getElementById("test-running"),
-  testResults:     document.getElementById("test-results"),
-  testLength:      document.getElementById("test-length"),
+  // Test mode — restructured in 1.1.1 to mirror Blitz: an in-row launch
+  // button opens a start modal, a thin in-progress hud shows during the run,
+  // and results appear in a result modal. The old #test-panel section is gone.
+  testOpen:        document.getElementById("test-open"),
+  testHud:         document.getElementById("test-hud"),
   testCurrent:     document.getElementById("test-current"),
   testTotal:       document.getElementById("test-total"),
-  testStart:       document.getElementById("test-start"),
   testCancel:      document.getElementById("test-cancel"),
+  testStartModal:  document.getElementById("test-start"),
+  testLength:      document.getElementById("test-length"),
+  testStartCancel: document.getElementById("test-start-cancel"),
+  testStartGo:     document.getElementById("test-start-go"),
+  testResultModal: document.getElementById("test-result"),
+  testResults:     document.getElementById("test-results"),
+  testResultAgain: document.getElementById("test-result-again"),
+  testResultDone:  document.getElementById("test-result-done"),
   // Blitz mode
   blitzOpen:       document.getElementById("blitz-open"),
   blitzHud:        document.getElementById("blitz-hud"),
@@ -441,20 +448,40 @@ function refreshStatsPanel() {
 }
 
 // ---------- test mode ----------
+// Restructured in 1.1.1 to mirror Blitz: a launch button opens a start
+// modal, a thin hud shows during the run, results land in a result modal.
 // When active, per-question feedback + autoplay are suppressed and each
-// answer is stored silently. After `length` answers, a summary is rendered
-// in the test panel and the test is marked finished.
+// answer is stored silently. After `length` answers, the result modal
+// opens and the test is marked finished.
+
+function openTestModal() {
+  if (state.pool.length === 0) {
+    setStatus("No challenges in the current pool — enable a filter first.");
+    return;
+  }
+  if (blitzActive()) {
+    alert("Finish or cancel the current Blitz round before starting a test.");
+    return;
+  }
+  // Pre-fill with the user's last-used length.
+  el.testLength.value = String(state.settings.testLength);
+  el.testStartModal.classList.remove("hidden");
+  // Defer focus so the modal is fully painted before selecting the input.
+  setTimeout(() => { try { el.testLength.focus(); el.testLength.select(); } catch {} }, 0);
+}
+
+function closeTestStartModal() {
+  el.testStartModal.classList.add("hidden");
+}
 
 function startTest() {
   const length = clampInt(el.testLength.value, 1, 500, state.settings.testLength);
   state.settings.testLength = length;
   saveSettings(state.settings);
 
+  closeTestStartModal();
   state.test = { length, answered: 0, results: [], finished: false };
-  el.testIdle.classList.add("hidden");
-  el.testResults.classList.add("hidden");
-  el.testResults.innerHTML = "";
-  el.testRunning.classList.remove("hidden");
+  el.testHud.classList.remove("hidden");
   el.testTotal.textContent = String(length);
   el.testCurrent.textContent = "1";
   track("test_start", { mode: state.mode, length });
@@ -479,9 +506,9 @@ function recordTestAnswer(outcome, input) {
 
 function finishTest() {
   state.test.finished = true;
-  el.testRunning.classList.add("hidden");
+  el.testHud.classList.add("hidden");
   renderTestResults();
-  el.testResults.classList.remove("hidden");
+  el.testResultModal.classList.remove("hidden");
   // GA: one event per completed test with aggregate outcome counts. Cheaper
   // than a per-question event (per-question already goes through score()),
   // and captures the "how did this attempt go" shape at test granularity.
@@ -493,16 +520,33 @@ function finishTest() {
     correct,
     accuracy: r.length ? Math.round(100 * correct / r.length) : 0,
   });
-  // Leave the drill challenge on screen too so they can keep drilling if
-  // they want; the idle controls stay hidden until "Dismiss" is clicked.
 }
 
 function cancelTest() {
   state.test = null;
-  el.testRunning.classList.add("hidden");
-  el.testResults.classList.add("hidden");
+  el.testHud.classList.add("hidden");
+  el.testResultModal.classList.add("hidden");
   el.testResults.innerHTML = "";
-  el.testIdle.classList.remove("hidden");
+}
+
+// Close the result modal without starting a new test. Mirrors the "Done"
+// button on the blitz result modal — drop the user back into a fresh
+// regular challenge so the last test prompt isn't sitting in the input
+// waiting for a stray Enter to double-score it.
+function closeTestResult() {
+  state.test = null;
+  el.testResultModal.classList.add("hidden");
+  el.testResults.innerHTML = "";
+  newChallenge();
+}
+
+// "New test" from the result modal: close the result, reopen the start
+// modal preloaded with the same length so the user can re-roll quickly.
+function playTestAgain() {
+  state.test = null;
+  el.testResultModal.classList.add("hidden");
+  el.testResults.innerHTML = "";
+  openTestModal();
 }
 
 function renderTestResults() {
@@ -514,10 +558,6 @@ function renderTestResults() {
   const pct = r.length === 0 ? 0 : Math.round(100 * correct / r.length);
 
   el.testResults.innerHTML = "";
-
-  const h = document.createElement("h3");
-  h.textContent = "Test complete";
-  el.testResults.appendChild(h);
 
   const summary = document.createElement("p");
   summary.className = "summary";
@@ -552,13 +592,6 @@ function renderTestResults() {
     }
     el.testResults.appendChild(ul);
   }
-
-  const again = document.createElement("button");
-  again.type = "button";
-  again.className = "mode-btn";
-  again.textContent = "New test";
-  again.addEventListener("click", () => { cancelTest(); });
-  el.testResults.appendChild(again);
 }
 
 function escapeHtml(s) {
@@ -577,6 +610,21 @@ function clampInt(v, lo, hi, fallback) {
 
 function testActive() {
   return state.test && !state.test.finished;
+}
+
+// Confirm-and-cancel before navigating away from the drill view. Returns
+// false if the user backed out of any confirm, true if it's safe to proceed.
+// Centralized so both Options and About switches behave the same.
+function leaveDrillGuard() {
+  if (blitzActive()) {
+    if (!confirm("Leaving the drill will cancel the current Blitz round. Continue?")) return false;
+    cancelBlitz();
+  }
+  if (testActive()) {
+    if (!confirm("Leaving the drill will cancel the current test. Continue?")) return false;
+    cancelTest();
+  }
+  return true;
 }
 
 // ---------- blitz mode ----------
@@ -1089,8 +1137,12 @@ function setView(view) {
   // per-mode so it re-renders on any mode switch that reaches this code path.
   el.presetsPanel.classList.toggle("hidden", !drill);
   if (drill) renderPresets();
-  // Test mode / stats / status line are drill-only; settings now live in Options.
-  el.testPanel.classList.toggle("hidden",     !drill);
+  // Stats / status line are drill-only; settings now live in Options. The
+  // test hud is gated on both: only show it on the drill view AND when a
+  // test is actually running. Hiding on leave keeps it from peeking into
+  // Options/About, showing on return preserves the user's place if they
+  // wandered off mid-test.
+  el.testHud.classList.toggle("hidden", !(drill && testActive()));
   el.statsPanel.classList.toggle("hidden",    !drill);
   el.statusLine.classList.toggle("hidden",    !drill);
   el.about.classList.toggle("hidden",          !about);
@@ -1364,13 +1416,29 @@ async function boot() {
       rebuildPool();
     });
 
-    // Test mode
+    // Test mode — launch button + start modal + cancel + result modal.
     el.testLength.value = String(state.settings.testLength);
-    el.testStart.addEventListener("click", () => startTest());
+    el.testOpen.addEventListener("click", openTestModal);
+    el.testStartCancel.addEventListener("click", closeTestStartModal);
+    el.testStartGo.addEventListener("click", () => startTest());
+    // Enter inside the questions input starts the test, so users on a
+    // keyboard don't have to mouse over to the Start button.
+    el.testLength.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); startTest(); }
+    });
+    // Backdrop click cancels the start modal.
+    el.testStartModal.addEventListener("click", (e) => {
+      if (e.target === el.testStartModal) closeTestStartModal();
+    });
     el.testCancel.addEventListener("click", () => {
       if (confirm("Cancel the current test? Answers so far will be discarded.")) {
         cancelTest();
       }
+    });
+    el.testResultAgain.addEventListener("click", playTestAgain);
+    el.testResultDone.addEventListener("click", closeTestResult);
+    el.testResultModal.addEventListener("click", (e) => {
+      if (e.target === el.testResultModal) closeTestResult();
     });
 
     // TTS readiness — if no Finnish voice, disable speak buttons and warn.
@@ -1414,19 +1482,14 @@ async function boot() {
     el.modeNoun.addEventListener("click",    () => setMode("noun"));
     el.modeVerb.addEventListener("click",    () => setMode("verb"));
     // Leaving the drill view during an active blitz round would orphan the
-    // timer. Confirm and cancel the round if the user wanders off mid-sprint.
+    // timer; leaving during an active test would orphan its progress strip.
+    // Confirm and tear down whichever is running before letting the user wander.
     el.modeOptions.addEventListener("click", () => {
-      if (blitzActive()) {
-        if (!confirm("Leaving the drill will cancel the current Blitz round. Continue?")) return;
-        cancelBlitz();
-      }
+      if (!leaveDrillGuard()) return;
       setView("options");
     });
     el.modeAbout.addEventListener("click",   () => {
-      if (blitzActive()) {
-        if (!confirm("Leaving the drill will cancel the current Blitz round. Continue?")) return;
-        cancelBlitz();
-      }
+      if (!leaveDrillGuard()) return;
       setView("about");
     });
 
@@ -1487,6 +1550,10 @@ async function boot() {
       if (e.key !== "Escape") return;
       if (!el.blitzStartModal.classList.contains("hidden")) {
         closeBlitzStartModal();
+      } else if (!el.testStartModal.classList.contains("hidden")) {
+        closeTestStartModal();
+      } else if (!el.testResultModal.classList.contains("hidden")) {
+        closeTestResult();
       } else if (blitzActive()) {
         if (confirm("Cancel the current Blitz round?")) cancelBlitz();
       } else if (!el.blitzResultModal.classList.contains("hidden")) {

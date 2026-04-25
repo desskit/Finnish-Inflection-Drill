@@ -96,12 +96,60 @@
         <button id="speak-answer" type="button" class="hint-btn" title="Hear the answer">
           Speak
         </button>
+        <button id="test-open" type="button" class="hint-btn test-btn"
+                title="Run a fixed-length test without per-question feedback">
+          Test
+        </button>
         <button id="blitz-open" type="button" class="hint-btn blitz-btn"
                 title="Timed sprint — score as many correct as you can">
           &#9889; Blitz
         </button>
       </div>
     </section>
+
+    <!-- Test in-progress strip: shown only while a test is running. Holds the
+         "Question X of Y" counter and a Cancel button. Idle and result states
+         are handled by the .test-modal overlays below. -->
+    <section id="test-hud" class="test-hud hidden" aria-live="polite">
+      <span>Question <span id="test-current">1</span> of <span id="test-total">10</span></span>
+      <button id="test-cancel" type="button" class="mini-btn">Cancel</button>
+    </section>
+
+    <!-- Test pre-run modal: question count + Start. Same modal chrome as
+         Blitz; dismissed by Cancel, Start, or clicking the backdrop. -->
+    <div id="test-start" class="test-modal hidden" role="dialog" aria-labelledby="test-start-title" aria-modal="true">
+      <div class="test-modal-inner">
+        <h2 id="test-start-title">Test mode</h2>
+        <p>
+          Answer a fixed number of questions without seeing your results until
+          the end. Stats still update as normal.
+        </p>
+        <div class="test-controls">
+          <label>
+            Questions:
+            <input id="test-length" type="number" min="1" max="500"
+                   class="inline-number" />
+          </label>
+        </div>
+        <div class="test-modal-actions">
+          <button id="test-start-cancel" type="button" class="mini-btn">Cancel</button>
+          <button id="test-start-go"     type="button" class="mode-btn">Start test</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Test result modal: rendered when the test completes. Body is built
+         programmatically by renderTestResults(). -->
+    <div id="test-result" class="test-modal hidden" role="dialog" aria-labelledby="test-result-title" aria-modal="true">
+      <div class="test-modal-inner">
+        <h2 id="test-result-title">Test complete</h2>
+        <div id="test-results" class="test-results"></div>
+        <div class="test-modal-actions">
+          <button id="test-result-again" type="button" class="mini-btn">New test</button>
+          <button id="test-result-done"  type="button" class="mode-btn">Done</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Blitz HUD: shown only during an active blitz round. Sits above the
          challenge card so the timer is always visible without displacing any
@@ -222,9 +270,12 @@
 
       <h3>Test mode</h3>
       <p>
-        Set a number of questions and the app runs them back-to-back without
-        showing whether each one was right. At the end you get accuracy plus a
-        review list of anything you missed. Statistics still update normally.
+        Click the <strong>Test</strong> button under the drill, pick a number
+        of questions, and the app runs them back-to-back without showing
+        whether each one was right. A small progress strip at the top tracks
+        which question you're on. At the end a summary pops up with accuracy
+        plus a review list of anything you missed. Statistics still update
+        normally.
       </p>
 
       <h3>Blitz mode</h3>
@@ -485,29 +536,6 @@
         </div>
         <p id="import-feedback" class="import-feedback"></p>
       </section>
-    </section>
-
-    <section id="test-panel" class="panel" aria-label="Test mode">
-      <div class="filter-section-head">
-        <h2>Test mode</h2>
-      </div>
-      <p class="panel-description">
-        Answer a fixed number of questions without seeing your results until
-        the end. Stats still update as normal.
-      </p>
-      <div id="test-idle" class="test-controls">
-        <label>
-          Questions:
-          <input id="test-length" type="number" min="1" max="500"
-                 class="inline-number" />
-        </label>
-        <button id="test-start" type="button" class="mode-btn">Start test</button>
-      </div>
-      <div id="test-running" class="test-progress hidden">
-        <span>Question <span id="test-current">1</span> of <span id="test-total">10</span></span>
-        <button id="test-cancel" type="button" class="mini-btn">Cancel</button>
-      </div>
-      <div id="test-results" class="test-results hidden"></div>
     </section>
 
     <details id="stats-panel" class="panel stats-panel">
