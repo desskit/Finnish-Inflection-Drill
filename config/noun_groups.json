@@ -2,8 +2,8 @@
   "_comment": "Noun ending-based groupings. Edit freely to change what the app offers. Each group has a stable `id` (referenced in data + stats), a human `label` (shown in UI), an `example` word, and the list of KOTUS types it covers. The Python pipeline uses `kotus_types` to tag each word with its group. If you want to split/merge groups, change this file and re-run the pipeline.",
   "groups": [
     { "id": "a_ae",         "label": "-a / -\u00e4 stems",         "example": "kala, py\u00f6r\u00e4",     "kotus_types": [9, 10, 11, 12, 13, 14, 15] },
-    { "id": "o_oe",         "label": "-o / -\u00f6 stems",         "example": "talo, ty\u00f6",         "kotus_types": [1, 4] },
-    { "id": "u_y",          "label": "-u / -y stems",              "example": "katu, kyky",           "kotus_types": [2, 3] },
+    { "id": "o_oe",         "label": "-o / -\u00f6 stems",         "example": "talo, valtio, ty\u00f6", "kotus_types": [1, 3, 4] },
+    { "id": "u_y",          "label": "-u / -y stems",              "example": "katu, kyky",           "kotus_types": [2] },
     { "id": "i_new",        "label": "-i stems (new loans)",       "example": "pankki, bussi",        "kotus_types": [5, 6] },
     { "id": "i_old",        "label": "-i stems (old, i\u2192e)",   "example": "suuri, vuosi, k\u00e4si", "kotus_types": [7, 23, 24, 25, 26, 27, 28, 29, 30, 31] },
     { "id": "e",            "label": "-e stems",                   "example": "nalle, itse",          "kotus_types": [8] },
