@@ -453,16 +453,16 @@ function renderRectionChoices() {
     const kbd = document.createElement("kbd");
     kbd.textContent = String(i + 1);
     btn.appendChild(kbd);
-    const nameEl = document.createElement("span");
-    nameEl.className = "choice-name";
-    nameEl.textContent = complementName(c);
-    btn.appendChild(nameEl);
     const h = complementHint(c);
+    const hintEl = document.createElement("span");
+    hintEl.className = "choice-hint";
+    hintEl.textContent = h || complementName(c);
+    btn.appendChild(hintEl);
     if (h) {
-      const hintEl = document.createElement("span");
-      hintEl.className = "choice-hint";
-      hintEl.textContent = h;
-      btn.appendChild(hintEl);
+      const nameEl = document.createElement("span");
+      nameEl.className = "choice-name";
+      nameEl.textContent = complementName(c);
+      btn.appendChild(nameEl);
     }
     if (resolved) {
       btn.disabled = true;

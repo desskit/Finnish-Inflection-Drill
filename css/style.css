@@ -369,12 +369,13 @@ body.possessive-mode .possessive-only { display: block; }
   transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
               background var(--dur) var(--ease), transform 80ms var(--ease);
 }
-.rection-choice .choice-name {
-  flex: 1;
-}
 .rection-choice .choice-hint {
-  font-size: 0.8em;
-  opacity: 0.6;
+  flex: 1;
+  font-weight: 500;
+}
+.rection-choice .choice-name {
+  font-size: 0.75em;
+  opacity: 0.5;
   text-align: right;
   white-space: nowrap;
 }
