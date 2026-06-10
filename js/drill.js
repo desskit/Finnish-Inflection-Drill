@@ -5,6 +5,7 @@
 // so all filter logic is in one place.
 
 import { retrievability } from "./srs.js";
+import { detectNounGradation, detectVerbGradation } from "./gradation.js";
 
 function randomChoice(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -26,6 +27,18 @@ function normalize(s) {
 
 // ---------- noun pool ----------
 
+// Returns true if the word passes the gradation dimension filter.
+// Only applies filtering when at least one pattern is unchecked; all-checked
+// (the default) skips detection entirely for performance.
+function passesGradeFilter(gf, detectFn, word) {
+  if (!gf) return true;
+  const allOn = Object.values(gf).every(Boolean);
+  if (allOn) return true;
+  const pat = detectFn(word);
+  const id  = pat ? pat.id : "none";
+  return gf[id] === true;
+}
+
 export function buildNounPool(data, filters) {
   const pool = [];
   for (const w of data.nouns.words) {
@@ -35,6 +48,7 @@ export function buildNounPool(data, filters) {
     // group ID not present in the filter map, or with no group at all),
     // which is why unchecking every box still produced challenges.
     if (filters && filters.groups && filters.groups[w.group] !== true) continue;
+    if (!passesGradeFilter(filters?.gradation, detectNounGradation, w)) continue;
     for (const key of Object.keys(w.inflections || {})) {
       // "Must be true" semantics — same reasoning as the group check above.
       // Some inflection keys in the data (e.g. instructive_singular on words
@@ -102,6 +116,7 @@ export function buildVerbPool(data, filters) {
   for (const w of data.verbs.words) {
     // Same "must be true" semantics as buildNounPool — see the note there.
     if (filters && filters.groups && filters.groups[w.group] !== true) continue;
+    if (!passesGradeFilter(filters?.gradation, detectVerbGradation, w)) continue;
     for (const key of Object.keys(w.inflections || {})) {
       if (filters && !verbKeyAllowed(key, filters)) continue;
       pool.push({ word: w, key });

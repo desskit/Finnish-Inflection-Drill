@@ -320,8 +320,16 @@ button.headword:hover { border-bottom-color: var(--accent); }
  * the card. The Rection button itself is hidden outside verb mode (JS). */
 .drill-style-row {
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 0.5rem;
   margin-bottom: 0.75rem;
+}
+
+.kpt-btn {
+  font-size: 0.72rem;
+  padding: 0.25rem 0.5rem;
+  white-space: nowrap;
 }
 
 /* Rection drill style: the answer is one of four multiple-choice complement
@@ -927,6 +935,23 @@ kbd {
 .infl-empty    { color: var(--muted-soft); }
 .infl-target   { color: var(--accent); font-weight: 600; }
 .infl-masked   { color: var(--muted); letter-spacing: 0.15em; }
+.infl-weak     { color: var(--muted); font-style: italic; }
+
+/* KPT reference modal */
+.kpt-inner { max-width: 560px; }
+.kpt-intro { font-size: 0.88rem; color: var(--muted); margin-bottom: 1rem; }
+.kpt-body  { overflow-x: auto; }
+.kpt-table { width: 100%; }
+.kpt-strong { font-weight: 700; color: var(--accent); }
+.kpt-weak   { font-weight: 700; color: var(--muted); }
+
+/* Gradation filter — collapsible details block */
+.gradation-filter { border-top: 1px solid var(--border); padding-top: 0.6rem; margin-top: 0.25rem; }
+.gradation-filter summary { list-style: none; cursor: pointer; }
+.gradation-filter summary::-webkit-details-marker { display: none; }
+.gradation-summary { padding: 0; }
+.gradation-summary h2::before { content: "▶ "; font-size: 0.65em; opacity: 0.5; }
+details[open] .gradation-summary h2::before { content: "▼ "; }
 @media (max-width: 420px) {
   .infl-table { font-size: 0.8rem; }
   .infl-table th,

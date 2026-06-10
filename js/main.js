@@ -30,6 +30,10 @@ import {
   loadBlitzStats, saveBlitzStats, recordBlitzRound, bestScoreAt, BLITZ_DURATIONS,
 } from "./blitz.js";
 import { APP_VERSION } from "./version.js";
+import {
+  GRADE_PATTERNS, GRADE_NONE,
+  detectNounGradation, detectVerbGradation, isWeakGrade,
+} from "./gradation.js";
 
 // Export-file schema version. Bumped only when the shape of the export
 // payload changes in a way that older code can't read directly — e.g. a key
@@ -187,6 +191,10 @@ const el = {
   blitzResultDone: document.getElementById("blitz-result-done"),
   blitzShareFeedback: document.getElementById("blitz-share-feedback"),
   settingShowBlitz:document.getElementById("setting-show-blitz"),
+  kptOpen:         document.getElementById("kpt-open"),
+  kptModal:        document.getElementById("kpt-modal"),
+  kptBody:         document.getElementById("kpt-body"),
+  kptClose:        document.getElementById("kpt-close"),
 };
 
 // ---------- rendering ----------
@@ -1612,7 +1620,7 @@ function closeInflectionTable() {
   if (state.view === "drill") el.answer.focus();
 }
 
-function inflectionCell(value, key, currentKey, expected, concealed) {
+function inflectionCell(value, key, currentKey, expected, concealed, gradeInfo) {
   const td = document.createElement("td");
   if (!value) {
     td.textContent = "—";
@@ -1620,7 +1628,13 @@ function inflectionCell(value, key, currentKey, expected, concealed) {
     return td;
   }
   if (key === currentKey) td.classList.add("infl-target");
-  if (concealed && value === expected) {
+  const masked = concealed && value === expected;
+  // Only tint when the cell isn't hidden — showing the grade class on a masked
+  // cell would leak that it's a weak/strong form before the answer is given.
+  if (!masked && gradeInfo && isWeakGrade(value, gradeInfo.pattern, gradeInfo.strongCStem)) {
+    td.classList.add("infl-weak");
+  }
+  if (masked) {
     td.classList.add("infl-masked");
     td.textContent = "•••";
     td.title = "hidden until you answer";
@@ -1649,6 +1663,11 @@ function inflectionTableSkeleton(headers) {
 
 function buildNounTable(word, currentKey, expected, concealed) {
   const { table, tbody } = inflectionTableSkeleton(["", "Singular", "Plural"]);
+  const gradePat  = detectNounGradation(word);
+  const strongCStem = gradePat
+    ? (word.inflections?.nominative_singular || word.word).replace(/[aäoeöuyi]+$/, "")
+    : null;
+  const gradeInfo = gradePat ? { pattern: gradePat, strongCStem } : null;
   for (const c of state.cfg.nounCases.cases) {
     const sg = word.inflections[`${c.id}_singular`];
     const pl = word.inflections[`${c.id}_plural`];
@@ -1658,8 +1677,8 @@ function buildNounTable(word, currentKey, expected, concealed) {
     th.scope = "row";
     th.textContent = c.label;
     tr.appendChild(th);
-    tr.appendChild(inflectionCell(sg, `${c.id}_singular`, currentKey, expected, concealed));
-    tr.appendChild(inflectionCell(pl, `${c.id}_plural`, currentKey, expected, concealed));
+    tr.appendChild(inflectionCell(sg, `${c.id}_singular`, currentKey, expected, concealed, gradeInfo));
+    tr.appendChild(inflectionCell(pl, `${c.id}_plural`,   currentKey, expected, concealed, gradeInfo));
     tbody.appendChild(tr);
   }
   return table;
@@ -1675,6 +1694,11 @@ const VERB_TABLE_PRONOUNS = {
 };
 
 function buildVerbTables(container, word, currentKey, expected, concealed) {
+  const gradePat    = detectVerbGradation(word);
+  const strongCStem = gradePat
+    ? word.word.replace(/[aäoeöuyi]+$/, "")
+    : null;
+  const gradeInfo = gradePat ? { pattern: gradePat, strongCStem } : null;
   const byTense = new Map(); // tenseId → { rowId → { positive: key, negative: key } }
   const nonFinite = [];
   for (const k of Object.keys(word.inflections || {})) {
@@ -1704,9 +1728,9 @@ function buildVerbTables(container, word, currentKey, expected, concealed) {
       th.textContent = VERB_TABLE_PRONOUNS[rowId] || rowId;
       tr.appendChild(th);
       tr.appendChild(inflectionCell(
-        word.inflections[slot.positive], slot.positive, currentKey, expected, concealed));
+        word.inflections[slot.positive], slot.positive, currentKey, expected, concealed, gradeInfo));
       tr.appendChild(inflectionCell(
-        word.inflections[slot.negative], slot.negative, currentKey, expected, concealed));
+        word.inflections[slot.negative], slot.negative, currentKey, expected, concealed, gradeInfo));
       tbody.appendChild(tr);
     }
     container.appendChild(table);
@@ -1723,7 +1747,7 @@ function buildVerbTables(container, word, currentKey, expected, concealed) {
       th.scope = "row";
       th.textContent = verbLabel(k, state.cfg);
       tr.appendChild(th);
-      tr.appendChild(inflectionCell(word.inflections[k], k, currentKey, expected, concealed));
+      tr.appendChild(inflectionCell(word.inflections[k], k, currentKey, expected, concealed, gradeInfo));
       tbody.appendChild(tr);
     }
     container.appendChild(table);
@@ -1833,6 +1857,49 @@ function removePreset(name) {
   deletePreset(state.presets, state.mode, name);
   savePresets(state.presets);
   renderPresets();
+}
+
+// ---------- KPT reference modal ----------
+
+function openKptModal() {
+  if (el.kptBody.childElementCount === 0) renderKptTable();
+  el.kptModal.classList.remove("hidden");
+}
+
+function closeKptModal() {
+  el.kptModal.classList.add("hidden");
+}
+
+function renderKptTable() {
+  const table = document.createElement("table");
+  table.className = "infl-table kpt-table";
+  const thead = document.createElement("thead");
+  const hr = document.createElement("tr");
+  for (const h of ["Strong", "Weak", "Noun (nom / gen)", "Verb (inf / 1sg)"]) {
+    const th = document.createElement("th");
+    th.textContent = h;
+    hr.appendChild(th);
+  }
+  thead.appendChild(hr);
+  table.appendChild(thead);
+  const tbody = document.createElement("tbody");
+  for (const p of GRADE_PATTERNS) {
+    const tr = document.createElement("tr");
+    const tdS = document.createElement("td");
+    tdS.textContent = p.strong;
+    tdS.className = "kpt-strong";
+    const tdW = document.createElement("td");
+    tdW.textContent = p.weak || "–";
+    tdW.className = "kpt-weak";
+    const tdN = document.createElement("td");
+    tdN.textContent = p.nounEx;
+    const tdV = document.createElement("td");
+    tdV.textContent = p.verbEx;
+    tr.append(tdS, tdW, tdN, tdV);
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  el.kptBody.appendChild(table);
 }
 
 // ---------- boot ----------
@@ -2080,6 +2147,13 @@ async function boot() {
       setDrillStyle(btn.dataset.value);
     });
 
+    // KPT reference modal.
+    el.kptOpen.addEventListener("click", openKptModal);
+    el.kptClose.addEventListener("click", closeKptModal);
+    el.kptModal.addEventListener("click", (e) => {
+      if (e.target === el.kptModal) closeKptModal();
+    });
+
     // Full inflection table — opened by tapping the headword.
     el.headword.addEventListener("click", openInflectionTable);
     el.inflectionClose.addEventListener("click", closeInflectionTable);
@@ -2117,7 +2191,9 @@ async function boot() {
     // want the picker to steal focus from there.
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
-      if (!el.inflectionModal.classList.contains("hidden")) {
+      if (!el.kptModal.classList.contains("hidden")) {
+        closeKptModal();
+      } else if (!el.inflectionModal.classList.contains("hidden")) {
         closeInflectionTable();
       } else if (!el.blitzStartModal.classList.contains("hidden")) {
         closeBlitzStartModal();

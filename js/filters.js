@@ -14,6 +14,7 @@
 //   }
 
 import * as storage from "./storage.js";
+import { GRADE_PATTERNS, GRADE_NONE } from "./gradation.js";
 
 const NOUN_KEY = "filters_noun_v1";
 const VERB_KEY = "filters_verb_v1";
@@ -42,7 +43,15 @@ export function defaultNounFilters(cfg) {
   for (const g of cfg.nounGroups.groups) groups[g.id] = true;
   const persons = {};
   for (const p of POSSESSIVE_PERSONS) persons[p.id] = true;
-  return { cases, groups, persons };
+  const gradation = defaultGradationDim();
+  return { cases, groups, persons, gradation };
+}
+
+function defaultGradationDim() {
+  const g = {};
+  for (const p of GRADE_PATTERNS) g[p.id] = true;
+  g[GRADE_NONE.id] = true;
+  return g;
 }
 
 export function defaultVerbFilters(cfg) {
@@ -52,6 +61,7 @@ export function defaultVerbFilters(cfg) {
     polarities: allOn(cfg.verbForms.polarities),
     persons:    allOn(cfg.verbForms.persons),
     groups:     allOn(cfg.verbGroups.groups),
+    gradation:  defaultGradationDim(),
   };
 }
 
@@ -117,6 +127,10 @@ export function renderNounFilters(root, cfg, state, onChange) {
   );
   personSection.classList.add("possessive-only");
   root.appendChild(personSection);
+
+  // Gradation filter — collapsed by default.
+  const gradeItems = [...GRADE_PATTERNS, GRADE_NONE];
+  root.appendChild(gradationSection(gradeItems, state.gradation, changed));
 }
 
 function renderCaseGrid(cfg, state, changed) {
@@ -220,11 +234,39 @@ export function renderVerbFilters(root, cfg, state, onChange) {
   root.appendChild(simpleCheckboxSection(
     "Verb type", cfg.verbGroups.groups, state.groups, changed, "group-list"
   ));
+
+  const gradeItems = [...GRADE_PATTERNS, GRADE_NONE];
+  root.appendChild(gradationSection(gradeItems, state.gradation, changed));
 }
 
 // =========================================================================
 // Shared helpers
 // =========================================================================
+
+// The gradation section is a collapsible <details> so it doesn't take up
+// space when the user isn't filtering by pattern.
+function gradationSection(items, stateDim, changed) {
+  const details = document.createElement("details");
+  details.className = "filter-section gradation-filter";
+  const summary = document.createElement("summary");
+  summary.className = "filter-section-head gradation-summary";
+  const h = document.createElement("h2");
+  h.textContent = "Gradation pattern";
+  summary.appendChild(h);
+  const btnAll = document.createElement("button");
+  btnAll.type = "button"; btnAll.textContent = "Select all"; btnAll.className = "mini-btn";
+  btnAll.addEventListener("click", (e) => { e.preventDefault(); toggleAll(stateDim, true);  changed(); });
+  const btnNone = document.createElement("button");
+  btnNone.type = "button"; btnNone.textContent = "Clear"; btnNone.className = "mini-btn";
+  btnNone.addEventListener("click", (e) => { e.preventDefault(); toggleAll(stateDim, false); changed(); });
+  summary.append(btnAll, btnNone);
+  details.appendChild(summary);
+  const list = document.createElement("div");
+  list.className = "group-list";
+  for (const it of items) list.appendChild(checkboxRow(it, stateDim, changed));
+  details.appendChild(list);
+  return details;
+}
 
 function simpleCheckboxSection(title, items, stateDim, changed, listClass) {
   const section = sectionWithHead(title,

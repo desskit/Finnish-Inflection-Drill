@@ -78,6 +78,7 @@
         <button type="button" class="seg-btn" data-value="possessive" role="radio">Possessive <span class="beta-tag">(beta)</span></button>
         <button type="button" class="seg-btn" data-value="rection"    role="radio">Rection <span class="beta-tag">(beta)</span></button>
       </div>
+      <button id="kpt-open" type="button" class="mini-btn kpt-btn" title="Consonant gradation reference">KPT</button>
     </div>
 
     <section id="challenge" class="panel challenge hidden">
@@ -134,6 +135,19 @@
         </button>
       </div>
     </section>
+
+    <!-- KPT reference modal: consonant gradation table, opened by the KPT
+         button in the drill-style row. Static content built by main.js. -->
+    <div id="kpt-modal" class="test-modal hidden" role="dialog" aria-labelledby="kpt-title" aria-modal="true">
+      <div class="test-modal-inner kpt-inner">
+        <h2 id="kpt-title">Consonant Gradation (KPT)</h2>
+        <p class="kpt-intro">Finnish alternates between a <strong>strong grade</strong> (nominative sg, infinitive) and a <strong>weak grade</strong> (genitive sg, most oblique cases, 1sg&nbsp;/&nbsp;2sg present).</p>
+        <div id="kpt-body" class="kpt-body"></div>
+        <div class="test-modal-actions">
+          <button id="kpt-close" type="button" class="mode-btn">Close</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Full inflection table for the current word, opened by tapping the
          headword. Until the challenge is answered, cells matching the current
