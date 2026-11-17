@@ -1,5 +1,5 @@
 {
-  "_comment": "Words to drop from the drill pool. Update manually as junk entries are reported. Match is exact against the lemma. Categories: Finnish letter names (aa..öö), foreign letter names (he, jota...), music notes (as, es, b..h), all-caps abbreviations that decline with a colon (DNA:ssa), malformed/misspelled lemmas, proper nouns, multi-word phrases, obscure dialect/synonym-of entries whose frequency rank comes from an unrelated homograph (e.g. the noun 'ja' = AND gate inherits rank 3 from the conjunction), and adjective superlative lemmas that are really common adverbs (takaisin, oikein, usein, öisin...) or archaic variants (parahin, kaunehin). Common comparatives/superlatives like parempi, paras, suurin are deliberately kept — their declension is worth drilling.",
+  "_comment": "Words to drop from the drill pool. Update manually as junk entries are reported. Match is exact against the lemma. Categories: Finnish letter names (aa..öö), foreign letter names (he, jota...), music notes (as, es, b..h), all-caps abbreviations that decline with a colon (DNA:ssa), malformed/misspelled lemmas, proper nouns, multi-word phrases, obscure dialect/synonym-of entries whose frequency rank comes from an unrelated homograph (e.g. the noun 'ja' = AND gate inherits rank 3 from the conjunction), and adjective superlative lemmas that are really common adverbs (takaisin, oikein, usein, öisin...) or archaic variants (parahin, kaunehin), and bound prefixes with a trailing hyphen (taka-, keski-). Common comparatives/superlatives like parempi, paras, suurin are deliberately kept — their declension is worth drilling.",
   "nouns": [
     "aa", "dee", "ee", "ii", "koo", "oo", "pee", "see", "uu", "vee",
     "yy", "äl", "äm", "äs", "ää", "öö",
@@ -27,7 +27,8 @@
     "takaisin", "oikein", "voisin", "täysin", "kovin", "väärin", "usein",
     "sekaisin", "tosin", "kotoisin", "aikaisin", "öisin", "iltaisin",
     "aamuisin", "kesäisin", "viikonloppuisin", "rinnakkain", "jäisin",
-    "paljain", "jaloin", "parahin", "kaunehin", "rakkahin"
+    "paljain", "jaloin", "parahin", "kaunehin", "rakkahin",
+    "taka-", "esi-", "ulko-", "pika-", "sisä-", "kauko-", "ala-", "ylä-", "lähi-", "keski-", "seka-", "liki-", "etä-"
   ],
   "verbs": [
     "ei", "eikä", "tarvii", "dallaa", "seistä",

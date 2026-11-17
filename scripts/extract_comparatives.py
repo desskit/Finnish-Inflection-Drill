@@ -48,7 +48,9 @@ DEGREES = ("comparative", "superlative")
 MIN_REAL_KEYS = 20
 
 # Archaic -hin superlatives (parahin, kaunehin, rakkahin) — poetic register,
-# never offered as answers or accepted alternatives.
+# never accepted as alternatives. Wiktionary lists them after the standard
+# form, so only non-first forms are checked: a first form like pahin or
+# köyhin has the same shape but is the regular superlative of an h-stem.
 ARCHAIC_SUPERLATIVE = re.compile(r"[aeiouyäö]hin$")
 
 # Suffixes after the stem, back-vowel spelling; "a" flips to "ä" for front
@@ -146,7 +148,7 @@ def degree_forms(entry: dict) -> dict[str, list[str]]:
             continue
         for d in DEGREES:
             if d in tags and s not in out[d]:
-                if d == "superlative" and ARCHAIC_SUPERLATIVE.search(s):
+                if d == "superlative" and out[d] and ARCHAIC_SUPERLATIVE.search(s):
                     continue
                 out[d].append(s)
     return out
