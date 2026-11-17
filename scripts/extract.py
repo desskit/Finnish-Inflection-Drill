@@ -126,8 +126,12 @@ def iter_entries(path: Path) -> Iterable[dict]:
 # — which is miserable to type in a drill), proper nouns, digits, slashes and
 # multi-word phrases. The audit that motivated this found only junk on the
 # wrong side of the regex (TV, UKK, "a/languages A to L", "oman onnensa
-# seppä", Joulupukki, ...) and zero legitimate words.
-LEMMA_OK = re.compile(r"^(?:[a-zåäöšž'-]+|[A-ZÅÄÖ]-[a-zåäöšž-]+)$")
+# seppä", Joulupukki, ...) and zero legitimate words. Hyphens must sit between
+# letters: a leading or trailing one marks a bound prefix/suffix (taka-,
+# keski-, lähi-), not a word you can decline.
+LEMMA_OK = re.compile(
+    r"^(?:[a-zåäöšž']+(?:-[a-zåäöšž']+)*|[A-ZÅÄÖ]-[a-zåäöšž]+(?:-[a-zåäöšž]+)*)$"
+)
 
 # Gloss patterns for entries that are dictionary metadata rather than words a
 # learner should drill. Letter names ("name of the Latin script letter L/l",

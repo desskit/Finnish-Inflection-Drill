@@ -10,7 +10,7 @@
 // ⚠️ BUMP `CACHE_VERSION` whenever you ship app-shell changes that users need
 //    to pick up. Without a bump, they'll keep the old cached files forever.
 
-const CACHE_VERSION = "finnish-drill-v1.8.1";
+const CACHE_VERSION = "finnish-drill-v1.9.0";
 
 // Files required for the app to boot offline. Paths are relative so this
 // works under any base path (e.g. GitHub Pages project site).
@@ -46,6 +46,7 @@ const PRECACHE = [
   "./data/rection.json",
   "./data/possessives.json",
   "./data/numerals.json",
+  "./data/comparatives.json",
   "./data/blocklist.json",
   "./icons/icon.svg",
 ];

@@ -128,9 +128,11 @@ export function recordOutcome(stats, mode, challenge, outcome) {
     // tense/voice/polarity/person buckets entirely.
     if (!stats.byRection) stats.byRection = {};
     bump(stats.byRection, challenge.key, outcome);
-  } else if (mode === "possessive") {
-    // Possessive keys are "{person}_{case}_{number}" — tracked per-item via
-    // byItem below; no additional dimension breakdown yet.
+  } else if (mode === "possessive" || mode === "comparative") {
+    // Possessive keys are "{person}_{case}_{number}", comparative keys
+    // "{degree}_{case}_{number}" — tracked per-item via byItem below; no
+    // additional dimension breakdown yet. (Must not fall through to the verb
+    // branch: parseVerbKey would misfile them.)
   } else {
     const p = parseVerbKey(challenge.key);
     bump(stats.byVerbTense,    p.tense,             outcome);
