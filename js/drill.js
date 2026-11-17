@@ -355,14 +355,49 @@ export function buildPossessivePool(data, nounFilters) {
   return out;
 }
 
+// ---------- comparative pool ----------
+// Challenge shape: { word, key: "{degree}_{case}_{number}", answer, accept?, baseWord }
+// Same layout as possessives: the degree takes the place of the person.
+// `accept` lists other standard forms for the same slot (pitkä → pidempi /
+// pitempi) that also count as correct.
+
+const COMPARATIVE_DEGREES = ["comparative", "superlative"];
+
+export function buildComparativePool(data, nounFilters) {
+  const out = [];
+  if (!data.comparatives || !Array.isArray(data.comparatives.words)) return out;
+  const nounMap = new Map();
+  for (const w of data.nouns.words) nounMap.set(w.word, w);
+  for (const cw of data.comparatives.words) {
+    if (nounFilters?.groups && nounFilters.groups[cw.group] !== true) continue;
+    const baseWord = nounMap.get(cw.word);
+    for (const degree of COMPARATIVE_DEGREES) {
+      if (nounFilters?.degrees && nounFilters.degrees[degree] !== true) continue;
+      const dInfl = (cw.inflections || {})[degree];
+      if (!dInfl) continue;
+      const alt = (cw.alternatives || {})[degree] || {};
+      for (const [caseKey, form] of Object.entries(dInfl)) {
+        if (!form || form === "-" || form === "—") continue;
+        if (nounFilters?.cases && nounFilters.cases[caseKey] !== true) continue;
+        const item = { word: cw, key: `${degree}_${caseKey}`, answer: form, baseWord };
+        if (alt[caseKey] && alt[caseKey] !== form) item.accept = [alt[caseKey]];
+        out.push(item);
+      }
+    }
+  }
+  return out;
+}
+
 export function checkAnswer(challenge, input) {
-  // Possessive challenges carry the expected answer directly to avoid navigating
-  // the nested possessive inflection structure in challenge.word.inflections.
+  // Possessive/comparative challenges carry the expected answer directly to
+  // avoid navigating their nested inflection structure in word.inflections.
   const expected = challenge.answer !== undefined
     ? challenge.answer
     : challenge.word.inflections[challenge.key];
-  const ok = normalize(input) === normalize(expected);
-  return { ok, expected, normalizedInput: normalize(input) };
+  const n = normalize(input);
+  const ok = n === normalize(expected) ||
+    (challenge.accept || []).some((a) => n === normalize(a));
+  return { ok, expected, normalizedInput: n };
 }
 
 // ---------- cloze ----------

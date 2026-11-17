@@ -5,12 +5,12 @@ import { loadConfig } from "./config.js";
 import { loadData } from "./data.js";
 import {
   buildNounPool, buildVerbPool, nextChallenge, checkAnswer,
-  buildClozePool, clozeBlankRegex, buildRectionPool, buildPossessivePool, parseVerbKey,
+  buildClozePool, clozeBlankRegex, buildRectionPool, buildPossessivePool, buildComparativePool, parseVerbKey,
 } from "./drill.js";
 import { nounLabel, verbLabel, complementLabel, complementName, complementHint } from "./labels.js";
 import {
-  loadNounFilters, saveNounFilters, renderNounFilters,
-  loadVerbFilters, saveVerbFilters, renderVerbFilters,
+  loadNounFilters, saveNounFilters, renderNounFilters, defaultNounFilters,
+  loadVerbFilters, saveVerbFilters, renderVerbFilters, defaultVerbFilters,
 } from "./filters.js";
 import {
   loadPresets, savePresets, listNames,
@@ -227,12 +227,15 @@ function render() {
       el.examples.innerHTML = "";
       el.examples.classList.add("hidden");
     }
-  } else if (possessiveActive()) {
+  } else if (possessiveActive() || comparativeActive()) {
     el.translation.textContent = (word.translations || []).slice(0, 2).join(", ");
     el.clozeLine.classList.add("hidden");
     el.targetForm.classList.remove("hidden");
-    const { person, caseKey } = parsePossessiveKey(key);
-    el.targetForm.textContent = `${nounLabel(caseKey, state.cfg)} — ${PERSON_LABELS[person] || person}`;
+    // Both key formats are "{prefix}_{case}_{number}" — the prefix is the
+    // possessor person or the degree.
+    const { person: prefix, caseKey } = parsePossessiveKey(key);
+    const prefixLabel = comparativeActive() ? DEGREE_LABELS[prefix] : PERSON_LABELS[prefix];
+    el.targetForm.textContent = `${nounLabel(caseKey, state.cfg)} — ${prefixLabel || prefix}`;
     const base = state.current.baseWord;
     if (base) renderExamples(base, state.current.answer);
     else { el.examples.innerHTML = ""; el.examples.classList.add("hidden"); }
@@ -325,19 +328,24 @@ function renderExamples(word, targetForm) {
 
 // ---------- drill style helpers ----------
 // The persisted drillStyle can be mode-specific ("rection" is verb-only,
-// "possessive" is noun-only). Rather than mutating the saved setting on every
-// mode switch, effectiveDrillStyle() falls back to standard outside the right
-// mode — switch back and the style resumes where you left it.
+// "possessive" and "comparative" are noun-only). Rather than mutating the
+// saved setting on every mode switch, effectiveDrillStyle() falls back to
+// standard outside the right mode — switch back and the style resumes where
+// you left it.
+const NOUN_ONLY_STYLES = ["possessive", "comparative"];
+const DRILL_STYLES = ["standard", "cloze", "rection", ...NOUN_ONLY_STYLES];
+
 function effectiveDrillStyle() {
   const s = (state.settings && state.settings.drillStyle) || "standard";
-  if (s === "rection"   && state.mode !== "verb") return "standard";
-  if (s === "possessive" && state.mode !== "noun") return "standard";
+  if (s === "rection" && state.mode !== "verb") return "standard";
+  if (NOUN_ONLY_STYLES.includes(s) && state.mode !== "noun") return "standard";
   return s;
 }
 
-function clozeActive()      { return effectiveDrillStyle() === "cloze"; }
-function rectionActive()    { return effectiveDrillStyle() === "rection"; }
-function possessiveActive() { return effectiveDrillStyle() === "possessive"; }
+function clozeActive()       { return effectiveDrillStyle() === "cloze"; }
+function rectionActive()     { return effectiveDrillStyle() === "rection"; }
+function possessiveActive()  { return effectiveDrillStyle() === "possessive"; }
+function comparativeActive() { return effectiveDrillStyle() === "comparative"; }
 
 // Possessive key format: "{person}_{case}_{number}", e.g. "1sg_inessive_singular"
 function parsePossessiveKey(key) {
@@ -353,10 +361,16 @@ const PERSON_LABELS = {
   "2pl": "your pl. (teidän)",
 };
 
+const DEGREE_LABELS = {
+  comparative: "comparative (-er)",
+  superlative: "superlative (-est)",
+};
+
 // Stats + SRS bucket each style under its own mode id so keys never collide.
 function statsMode() {
-  if (rectionActive())    return "rection";
-  if (possessiveActive()) return "possessive";
+  if (rectionActive())     return "rection";
+  if (possessiveActive())  return "possessive";
+  if (comparativeActive()) return "comparative";
   return state.mode;
 }
 
@@ -576,6 +590,8 @@ function updateStatus() {
       suffix = " \u2014 no example sentences match these filters; broaden them or switch to Standard";
     } else if (possessiveActive()) {
       suffix = " \u2014 no possessive data within the current filters; enable more noun groups above";
+    } else if (comparativeActive()) {
+      suffix = " \u2014 no adjectives within the current filters; enable more word types or degrees above";
     } else {
       suffix = " \u2014 all filtered out, enable something above";
     }
@@ -1413,6 +1429,10 @@ function rebuildPool(opts) {
     // Possessive drill uses the possessives dataset filtered by the same noun
     // group/case checkboxes. Length and cloze filters don't apply here.
     pool = buildPossessivePool(state.data, state.nounFilters);
+  } else if (comparativeActive()) {
+    // Comparative drill: adjectives' degree forms, filtered by the noun
+    // case/word-type checkboxes plus the Degree section.
+    pool = buildComparativePool(state.data, state.nounFilters);
   } else {
     pool = state.mode === "noun"
       ? buildNounPool(state.data, state.nounFilters)
@@ -1528,11 +1548,12 @@ function renderDrillStyleSwitch() {
   if (!el.drillStyleSwitch) return;
   const pref = effectiveDrillStyle();
   for (const btn of el.drillStyleSwitch.querySelectorAll(".seg-btn")) {
-    // Rection is verb-only; Possessive is noun-only — hide each outside its mode.
+    // Rection is verb-only; Possessive and Comparative are noun-only — hide
+    // each outside its mode.
     if (btn.dataset.value === "rection") {
       btn.classList.toggle("hidden", state.mode !== "verb");
     }
-    if (btn.dataset.value === "possessive") {
+    if (NOUN_ONLY_STYLES.includes(btn.dataset.value)) {
       btn.classList.toggle("hidden", state.mode !== "noun");
     }
     const active = btn.dataset.value === pref;
@@ -1550,13 +1571,15 @@ function updateAnswerPlaceholder() {
 // Swap body classes for mode-specific chrome.
 // rection-mode: hides the typed-answer input + hint buttons (multiple choice instead).
 // possessive-mode: reveals the Possessor filter section in the noun panel.
+// comparative-mode: reveals the Degree filter section in the noun panel.
 function applyRectionChrome() {
-  document.body.classList.toggle("rection-mode",    rectionActive());
-  document.body.classList.toggle("possessive-mode", possessiveActive());
+  document.body.classList.toggle("rection-mode",     rectionActive());
+  document.body.classList.toggle("possessive-mode",  possessiveActive());
+  document.body.classList.toggle("comparative-mode", comparativeActive());
 }
 
 function setDrillStyle(style) {
-  if (style !== "standard" && style !== "cloze" && style !== "rection" && style !== "possessive") return;
+  if (!DRILL_STYLES.includes(style)) return;
   if (state.settings.drillStyle === style) return;
   // Each style is a different challenge set, so switching mid-test or
   // mid-blitz invalidates the run — same confirm flow as a mode switch.
@@ -1591,10 +1614,10 @@ function openInflectionTable() {
   if (blitzActive() || testActive()) return;
   const { word, key } = state.current;
   el.inflectionBody.innerHTML = "";
-  if (possessiveActive()) {
-    // Show the base noun's plain inflection table as a paradigm reference.
-    // No masking — the possessive form isn't in the base table, so there's
-    // nothing to conceal that would spoil the answer.
+  if (possessiveActive() || comparativeActive()) {
+    // Show the base word's plain inflection table as a paradigm reference.
+    // No masking — the possessive/degree form isn't in the base table, so
+    // there's nothing to conceal that would spoil the answer.
     const base = state.current.baseWord || word;
     el.inflectionTitle.textContent = base.word;
     el.inflectionNote.classList.add("hidden");
@@ -1812,6 +1835,15 @@ function buildPresetRow(name) {
 function applyPreset(name) {
   const snap = getPreset(state.presets, state.mode, name);
   if (!snap) return;
+  // Presets saved before a filter dimension existed (possessor, degree,
+  // gradation) lack it entirely, and the renderer would crash reading it.
+  // Fill gaps from the defaults, same as loading saved filters does.
+  const defaults = state.mode === "noun"
+    ? defaultNounFilters(state.cfg)
+    : defaultVerbFilters(state.cfg);
+  for (const dim of Object.keys(defaults)) {
+    snap[dim] = { ...defaults[dim], ...(snap[dim] || {}) };
+  }
   // Replace filter state wholesale and persist, then re-render the filter
   // panel so the checkboxes reflect the new values. rebuildPool() picks up
   // the change and surfaces a fresh challenge.

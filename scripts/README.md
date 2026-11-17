@@ -29,6 +29,8 @@ python scripts/extract.py               # filters and writes data/nouns.json + v
                                         # they decline identically)
 python scripts/extract_rection.py       # rection annotations → data/rection.json
 python scripts/extract_possessives.py   # possessive paradigms → data/possessives.json
+python scripts/extract_comparatives.py  # adjective comparative/superlative paradigms
+                                        # → data/comparatives.json
 python scripts/extract_numerals.py      # numeral paradigms → data/numerals.json
 python scripts/gen_compound_numerals.py # fills in any 11-19 / tens missing from
                                         # Wiktionary by composing base paradigms

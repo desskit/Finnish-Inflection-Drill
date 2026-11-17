@@ -27,6 +27,11 @@ const POSSESSIVE_PERSONS = [
   { id: "2pl", label: "2pl — your pl. (teidän)" },
 ];
 
+const COMPARATIVE_DEGREES = [
+  { id: "comparative", label: "Comparative — isompi, pienempi" },
+  { id: "superlative", label: "Superlative — isoin, pienin" },
+];
+
 // =========================================================================
 // Defaults + load/save
 // =========================================================================
@@ -43,8 +48,9 @@ export function defaultNounFilters(cfg) {
   for (const g of cfg.nounGroups.groups) groups[g.id] = true;
   const persons = {};
   for (const p of POSSESSIVE_PERSONS) persons[p.id] = true;
+  const degrees = allOn(COMPARATIVE_DEGREES);
   const gradation = defaultGradationDim();
-  return { cases, groups, persons, gradation };
+  return { cases, groups, persons, degrees, gradation };
 }
 
 function defaultGradationDim() {
@@ -127,6 +133,13 @@ export function renderNounFilters(root, cfg, state, onChange) {
   );
   personSection.classList.add("possessive-only");
   root.appendChild(personSection);
+
+  // Degrees — only relevant in Comparative drill style (body.comparative-mode).
+  const degreeSection = simpleCheckboxSection(
+    "Degree", COMPARATIVE_DEGREES, state.degrees, changed, "group-list"
+  );
+  degreeSection.classList.add("comparative-only");
+  root.appendChild(degreeSection);
 
   // Gradation filter — collapsed by default.
   const gradeItems = [...GRADE_PATTERNS, GRADE_NONE];

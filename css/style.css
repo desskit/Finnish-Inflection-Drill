@@ -346,6 +346,9 @@ body.rection-mode #blitz-open { display: none; }
 /* Possessor filter section: hidden by default, shown only in possessive style. */
 .possessive-only { display: none; }
 body.possessive-mode .possessive-only { display: block; }
+/* Degree filter section: same idea, shown only in comparative style. */
+.comparative-only { display: none; }
+body.comparative-mode .comparative-only { display: block; }
 
 .rection-choices {
   display: grid;

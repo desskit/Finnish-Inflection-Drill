@@ -40,18 +40,25 @@ async function loadNumerals() {
   catch { return { cases: [], numbers: [], words: [] }; }
 }
 
+async function loadComparatives() {
+  try { return await loadJson("data/comparatives.json"); }
+  catch { return { degrees: [], cases: [], numbers: [], words: [] }; }
+}
+
 export async function loadData() {
-  const [nouns, verbs, rection, possessives, numerals, blocklist] = await Promise.all([
+  const [nouns, verbs, rection, possessives, numerals, comparatives, blocklist] = await Promise.all([
     loadJson("data/nouns.json"),
     loadJson("data/verbs.json"),
     loadRection(),
     loadPossessives(),
     loadNumerals(),
+    loadComparatives(),
     loadBlocklist(),
   ]);
   if (blocklist.nouns.size) {
     nouns.words = nouns.words.filter((w) => !blocklist.nouns.has(w.word));
     possessives.words = possessives.words.filter((w) => !blocklist.nouns.has(w.word));
+    comparatives.words = comparatives.words.filter((w) => !blocklist.nouns.has(w.word));
   }
   if (blocklist.verbs.size) {
     verbs.words = verbs.words.filter((w) => !blocklist.verbs.has(w.word));
@@ -64,5 +71,5 @@ export async function loadData() {
   for (const w of numerals.words) {
     nouns.words.push({ ...w, group: "numeral" });
   }
-  return { nouns, verbs, rection, possessives };
+  return { nouns, verbs, rection, possessives, comparatives };
 }
