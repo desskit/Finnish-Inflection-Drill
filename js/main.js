@@ -198,6 +198,29 @@ const el = {
 };
 
 // ---------- rendering ----------
+
+// Write a grammatical prompt into #target-form. Browsers may break a line
+// right after a hyphen, which on a narrow phone splits an ending hint as
+// "superlative (-" / "est)". Each parenthetical, together with the word
+// before it, goes into a nowrap span so lines only break between units.
+function setPromptText(text) {
+  el.targetForm.textContent = "";
+  // split() with a capture group puts the matched units at the odd indices.
+  const parts = text.split(/(\S+ \([^)]*\))/);
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (!part) continue;
+    if (i % 2 === 1) {
+      const span = document.createElement("span");
+      span.className = "nowrap";
+      span.textContent = part;
+      el.targetForm.appendChild(span);
+    } else {
+      el.targetForm.appendChild(document.createTextNode(part));
+    }
+  }
+}
+
 function render() {
   if (!state.current) {
     el.challenge.classList.add("hidden");
@@ -235,7 +258,7 @@ function render() {
     // possessor person or the degree.
     const { person: prefix, caseKey } = parsePossessiveKey(key);
     const prefixLabel = comparativeActive() ? DEGREE_LABELS[prefix] : PERSON_LABELS[prefix];
-    el.targetForm.textContent = `${nounLabel(caseKey, state.cfg)} — ${prefixLabel || prefix}`;
+    setPromptText(`${nounLabel(caseKey, state.cfg)} — ${prefixLabel || prefix}`);
     const base = state.current.baseWord;
     if (base) renderExamples(base, state.current.answer);
     else { el.examples.innerHTML = ""; el.examples.classList.add("hidden"); }
@@ -253,7 +276,7 @@ function render() {
       el.examples.classList.add("hidden");
     } else {
       const label = state.mode === "noun" ? nounLabel(key, state.cfg) : verbLabel(key, state.cfg);
-      el.targetForm.textContent = label;
+      setPromptText(label);
       renderExamples(word, word.inflections[key]);
     }
   }

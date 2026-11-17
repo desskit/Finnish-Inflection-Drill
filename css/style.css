@@ -281,6 +281,9 @@ h1::before {
   letter-spacing: 0.01em;
   font-weight: 500;
 }
+/* A "word (ending)" unit in the prompt — kept on one line so it never
+ * breaks as "superlative (-" / "est)". See setPromptText() in main.js. */
+.target-form .nowrap { white-space: nowrap; }
 
 /* The headword is a button now — tapping it opens the full inflection table.
  * Strip the UA button chrome so it still reads as the big accent word; the
@@ -324,6 +327,25 @@ button.headword:hover { border-bottom-color: var(--accent); }
   justify-content: center;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
+}
+
+/* With five styles the switch is wider than a phone. It may shrink (KPT keeps
+ * its size beside it) and wraps its buttons onto a second row instead of
+ * overflowing — a centered flex row that overflows pushes buttons off the
+ * left edge where they can't be scrolled to. Each button stays whole
+ * ("Possessive (beta)" never splits), and the radius is set so one row
+ * still reads as a pill while two rows read as a rounded panel. */
+.drill-style-row .seg-switch {
+  flex: 0 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: center;
+  border-radius: 1.2rem;
+}
+.drill-style-row .seg-btn { white-space: nowrap; }
+.drill-style-row .kpt-btn { flex: none; }
+@media (max-width: 520px) {
+  .drill-style-row .seg-btn { padding: 0.35rem 0.7rem; }
 }
 
 .kpt-btn {
@@ -1071,7 +1093,13 @@ details[open] .gradation-summary h2::before { content: "▼ "; }
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
+/* A select can't shrink below its widest option ("Balanced (2-month
+ * ceiling)"), so on a narrow phone with enlarged text its label plus the
+ * description beside it outgrow the screen. Let the description drop to
+ * its own line instead. */
+.group-row:has(.inline-select) { flex-wrap: wrap; }
 .inline-select {
+  max-width: 100%;
   background: var(--panel-2);
   color: var(--text);
   border: 1px solid var(--border);
