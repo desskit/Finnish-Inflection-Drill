@@ -1,6 +1,10 @@
-# Finnish Drilling App
+# Finnish Inflection Drill
 
-A PWA for drilling Finnish noun and verb inflections, sourced from Wiktionary.
+**Try it: [desskit.github.io/Finnish-Inflection-Drill](https://desskit.github.io/Finnish-Inflection-Drill/)**
+
+A free PWA for practising Finnish noun cases, verb conjugations, possessive
+suffixes and adjective comparison — type the inflected form of 7,000+ common
+words, sourced from Wiktionary. Works offline once loaded.
 
 ## Project layout
 
@@ -13,7 +17,8 @@ finnish-drill/
   js/                    App logic (vanilla JS, no build step)
   data/                  Generated word data (nouns.json, verbs.json)
   config/                Editable data files (ending groups, filters, etc.)
-  icons/                 App icons (icon.svg + optional 192/512 PNGs)
+  icons/                 App icons (icon.svg + 192/512 PNGs) and og-image.png (link previews)
+  sitemap.xml            For Google Search Console
   scripts/               One-time Python pipeline that builds data/*.json
 ```
 
@@ -42,12 +47,11 @@ to run offline. A few notes:
   command above, or deploy to GitHub Pages.
 - **Bump `CACHE_VERSION` in `sw.js`** whenever you ship code/data changes.
   Without a bump, browsers keep serving the old cached copy.
-- **PNG icons**: the manifest also references `icons/icon-192.png` and
-  `icons/icon-512.png` for platforms that don't render SVG icons (iOS
-  home-screen install, some older Android launchers). Generate them once
-  with:
+- **PNG icons**: `icons/icon-192.png` and `icons/icon-512.png` (committed)
+  cover platforms that don't render SVG icons — iOS home-screen install,
+  some older Android launchers. If you change `icons/icon.svg`, regenerate
+  them with:
   ```
   pip install cairosvg
   python scripts/make_icons.py
   ```
-  The SVG icon alone is enough for desktop Chrome / modern Android.

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Submit this in Google Search Console (Sitemaps). A GitHub Pages project
+     site can't serve robots.txt at the domain root, so the sitemap is
+     submitted directly instead of being referenced from robots.txt. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://desskit.github.io/Finnish-Inflection-Drill/</loc>
+  </url>
+</urlset>
