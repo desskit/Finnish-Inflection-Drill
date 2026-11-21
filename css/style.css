@@ -747,6 +747,10 @@ kbd {
   .hint-btn.test-btn { margin-left: 0; }
 }
 
+/* During a round the whole hint row goes: hints and Speak would leak the
+ * answer, and Test/Blitz would start a run on top of the current one. */
+body.blitz-mode .hint-row { display: none; }
+
 /* In-round HUD: timer bar on top, a single row with time / score / combo.
  * Padding matches .panel so it docks flush with the challenge card above. */
 .blitz-hud {

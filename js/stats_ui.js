@@ -1,7 +1,7 @@
 // Renders the stats panel — an overall summary plus per-dimension breakdowns.
 // Pure DOM, no framework.
 
-import { summarize, summarizeByWord, accuracy, averageReviewsPerDay } from "./stats.js";
+import { summarize, summarizeByWord, accuracy, averageReviewsPerDay, reviewsToday } from "./stats.js";
 import { nounLabel, verbLabel, rectionLabel } from "./labels.js";
 
 // UI-only state for the per-word tables. Persists across re-renders (toggle
@@ -43,7 +43,7 @@ function overallLine(stats) {
 }
 
 function todayLine(stats) {
-  const count = stats.todayCount || 0;
+  const count = reviewsToday(stats);
   if (count === 0) return "No reviews yet today.";
   return `Today: ${count.toLocaleString()} review${count === 1 ? "" : "s"}`;
 }

@@ -16,8 +16,11 @@ Run: python scripts/extract_numerals.py
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
+
+FOOTNOTE = re.compile(r"\s*\(\*+\)|\*+$")
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA   = ROOT / "data"
@@ -93,6 +96,9 @@ def extract_inflections(entry: dict) -> dict[str, str]:
     inflections: dict[str, str] = {}
     for f in entry.get("forms") or []:
         form_str = f.get("form")
+        # Wiktionary marks rare or archaic forms with a footnote ("nelin (*)");
+        # the marker isn't part of the word and would end up in the answer.
+        form_str = FOOTNOTE.sub("", form_str or "").strip()
         if not form_str or form_str in ("-", "—"):
             continue
         tags  = set(f.get("tags") or [])

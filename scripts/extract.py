@@ -450,6 +450,14 @@ def main() -> int:
         if not shaped["inflections"]:
             counts[f"no_inflections_{pos}"] += 1
             continue
+        # Untypeable tables: abbreviations that decline with a colon (oy:n,
+        # tosi-tv:n), entries whose table cells hold an IPA transcription
+        # instead of the word ("/ˈko̞lidsi/" for college), and prefix-only
+        # nouns whose nominative is a bound form ("taka-").
+        if any(":" in f or f.startswith("/") or f.startswith("-") or f.endswith("-")
+               for f in shaped["inflections"].values()):
+            counts[f"junk_forms_{pos}"] += 1
+            continue
         shaped["frequency_rank"] = rank
         (nouns if nounlike else verbs).append(shaped)
 

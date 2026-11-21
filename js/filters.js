@@ -143,7 +143,7 @@ export function renderNounFilters(root, cfg, state, onChange) {
 
   // Gradation filter — collapsed by default.
   const gradeItems = [...GRADE_PATTERNS, GRADE_NONE];
-  root.appendChild(gradationSection(gradeItems, state.gradation, changed));
+  root.appendChild(gradationSection(gradeItems, state.gradation, changed, "noun"));
 }
 
 function renderCaseGrid(cfg, state, changed) {
@@ -249,18 +249,25 @@ export function renderVerbFilters(root, cfg, state, onChange) {
   ));
 
   const gradeItems = [...GRADE_PATTERNS, GRADE_NONE];
-  root.appendChild(gradationSection(gradeItems, state.gradation, changed));
+  root.appendChild(gradationSection(gradeItems, state.gradation, changed, "verb"));
 }
 
 // =========================================================================
 // Shared helpers
 // =========================================================================
 
+// Whether each mode's gradation section is expanded. Every filter change
+// rebuilds the whole panel, so without this the section would snap shut on
+// each checkbox click. Session-only: it starts collapsed on a fresh load.
+const gradationOpen = { noun: false, verb: false };
+
 // The gradation section is a collapsible <details> so it doesn't take up
 // space when the user isn't filtering by pattern.
-function gradationSection(items, stateDim, changed) {
+function gradationSection(items, stateDim, changed, mode) {
   const details = document.createElement("details");
   details.className = "filter-section gradation-filter";
+  details.open = gradationOpen[mode];
+  details.addEventListener("toggle", () => { gradationOpen[mode] = details.open; });
   const summary = document.createElement("summary");
   summary.className = "filter-section-head gradation-summary";
   const h = document.createElement("h2");
