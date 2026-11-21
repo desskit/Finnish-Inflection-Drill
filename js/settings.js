@@ -45,9 +45,42 @@ export function defaultSettings() {
   };
 }
 
+// Allowed values for the enum-like settings; must match the controls in
+// index.html. Anything else (a damaged store, an imported file from another
+// version) falls back to the default instead of leaving a switch with nothing
+// selected — or, for maxAnswerLength, silently filtering the pool to empty.
+const ENUMS = {
+  priorityMode:  ["uniform", "weighted", "srs"],
+  srsCap:        ["often", "balanced", "rarely"],
+  theme:         ["system", "light", "dark"],
+  drillStyle:    ["standard", "cloze", "rection", "possessive", "comparative"],
+  frequencyCap:  [0, 1000, 2500, 5000, 10000],
+  blitzDuration: [30, 60, 120],
+};
+const INT_RANGES = {
+  maxAnswerLength: [5, 40],
+  testLength:      [1, 500],
+};
+
+export function sanitizeSettings(s) {
+  const d = defaultSettings();
+  const out = { ...s };
+  for (const [k, def] of Object.entries(d)) {
+    if (typeof def === "boolean" && typeof out[k] !== "boolean") out[k] = def;
+  }
+  for (const [k, allowed] of Object.entries(ENUMS)) {
+    if (!allowed.includes(out[k])) out[k] = d[k];
+  }
+  for (const [k, [lo, hi]] of Object.entries(INT_RANGES)) {
+    const n = Number(out[k]);
+    out[k] = Number.isInteger(n) ? Math.min(hi, Math.max(lo, n)) : d[k];
+  }
+  return out;
+}
+
 export function loadSettings() {
   const stored = storage.load(KEY, null);
-  if (!stored) return defaultSettings();
+  if (!stored || typeof stored !== "object") return defaultSettings();
   const merged = { ...defaultSettings(), ...stored };
   // Legacy migration: `weightedSampling` was a boolean checkbox in <=v0.11.
   // Translate it to the new three-way priority mode exactly once, then drop
@@ -64,7 +97,7 @@ export function loadSettings() {
   if (!Object.prototype.hasOwnProperty.call(stored, "showStreak")) {
     merged.showStreak = true;
   }
-  return merged;
+  return sanitizeSettings(merged);
 }
 
 export function saveSettings(s) { storage.save(KEY, s); }

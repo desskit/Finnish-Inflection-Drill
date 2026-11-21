@@ -150,7 +150,7 @@
         <button id="hint-answer" type="button" class="hint-btn" title="Show full answer (.)">
           Show answer <kbd>.</kbd>
         </button>
-        <button id="skip" type="button" class="hint-btn" title="Skip this word (-)">
+        <button id="skip" type="button" class="hint-btn" title="Skip this word (- in an empty answer box)">
           Skip <kbd>-</kbd>
         </button>
         <button id="speak-answer" type="button" class="hint-btn" title="Hear the answer">
@@ -376,6 +376,14 @@
         patterns. Tests and Blitz aren't available in this style.
       </p>
       <p>
+        <strong>Possessive</strong> (noun mode only) drills possessive
+        suffixes on top of the case endings: you get a noun and a prompt like
+        &ldquo;inessive singular &mdash; my (minun)&rdquo;, and type the
+        combined form (<em>talo</em> &rarr; <em>talossani</em>). The
+        Possessor filter picks which persons come up; the case grid and word
+        types apply as usual.
+      </p>
+      <p>
         <strong>Comparative</strong> (noun mode only) drills adjective
         degrees: you get an adjective and a prompt like &ldquo;inessive
         singular &mdash; comparative&rdquo;, and type the declined degree
@@ -399,8 +407,8 @@
       <h3>Filter presets</h3>
       <p>
         Once you've dialed in a filter selection you like, click
-        <strong>Save current&hellip;</strong> under <em>Presets</em> (between
-        the filter grid and Test mode) and give it a name. Saved presets are
+        <strong>Save current&hellip;</strong> under <em>Presets</em> (below
+        the filters) and give it a name. Saved presets are
         per mode &mdash; noun and verb presets are kept separate &mdash; and
         clicking one applies it instantly. Reuse the same name to overwrite.
       </p>
@@ -500,7 +508,9 @@
         <li><kbd>Enter</kbd> &mdash; submit / advance</li>
         <li><kbd>;</kbd> &mdash; reveal the next letter</li>
         <li><kbd>.</kbd> &mdash; show the full answer</li>
-        <li><kbd>-</kbd> &mdash; skip this word</li>
+        <li><kbd>-</kbd> &mdash; skip this word (in an empty answer box; once
+          you've started typing, it types a hyphen, as in
+          <em>kuorma-autossa</em>)</li>
       </ul>
 
       <h3>Audio</h3>
@@ -612,7 +622,7 @@
           <span class="group-label">
             Hide answers longer than
             <input id="setting-max-length" type="number" min="5" max="40"
-                   class="inline-number" />
+                   class="inline-number" aria-label="Maximum answer length in characters" />
             characters
           </span>
           <span class="group-example">skips awkward partitive-plural, compound, etc.</span>

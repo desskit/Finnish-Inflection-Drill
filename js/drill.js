@@ -19,6 +19,9 @@ function normalize(s) {
   // "vuo\u2019den" (right single quote). Finnish orthography only uses a
   // plain apostrophe, so collapsing the whole family to ' is safe.
   return (s || "")
+    // NFC first: some keyboards emit "ä" as "a" + combining diaeresis, which
+    // looks identical but would never equal the stored precomposed form.
+    .normalize("NFC")
     .trim()
     .toLowerCase()
     .replace(/\s+/g, " ")
@@ -341,6 +344,8 @@ export function buildPossessivePool(data, nounFilters) {
   for (const pw of data.possessives.words) {
     if (nounFilters?.groups && nounFilters.groups[pw.group] !== true) continue;
     const baseWord = nounMap.get(pw.word);
+    // Gradation is a property of the base noun (käsi → käteni follows käsi → käden).
+    if (!passesGradeFilter(nounFilters?.gradation, detectNounGradation, baseWord || { word: pw.word })) continue;
     for (const person of POSSESSIVE_PERSONS) {
       if (nounFilters?.persons && nounFilters.persons[person] !== true) continue;
       const pInfl = (pw.inflections || {})[person];
@@ -371,6 +376,8 @@ export function buildComparativePool(data, nounFilters) {
   for (const cw of data.comparatives.words) {
     if (nounFilters?.groups && nounFilters.groups[cw.group] !== true) continue;
     const baseWord = nounMap.get(cw.word);
+    // Filter on the base adjective's gradation (tarkka → tarkempi, weak grade).
+    if (!passesGradeFilter(nounFilters?.gradation, detectNounGradation, baseWord || { word: cw.word })) continue;
     for (const degree of COMPARATIVE_DEGREES) {
       if (nounFilters?.degrees && nounFilters.degrees[degree] !== true) continue;
       const dInfl = (cw.inflections || {})[degree];
@@ -465,9 +472,12 @@ export function buildClozePool(pool) {
   // challenge several times over, so dedupe on what the user actually sees.
   const seen = new Set();
   for (const { word, key } of pool) {
-    // Skip the nominative singular: its blank is just the headword already
-    // shown in the hint line, so typing it teaches nothing.
+    // Skip any form spelled the same as the headword — the nominative
+    // singular, but also e.g. pitää's 3sg present "pitää" or olot's
+    // nominative plural: the blank is already shown in the hint line, so
+    // typing it teaches nothing.
     if (key === "nominative_singular") continue;
+    if (normalize(word.inflections[key]) === normalize(word.word)) continue;
     const exampleIndex = findClozeExampleIndex(word, key);
     if (exampleIndex < 0) continue;
     const dedupeKey = `${word.word}|${exampleIndex}|${normalize(word.inflections[key])}`;

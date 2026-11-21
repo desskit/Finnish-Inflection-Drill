@@ -68,6 +68,18 @@ export async function loadData() {
   // fold into the noun pool under their own group id "numeral". Adding them here
   // keeps pool-building logic unchanged — the noun group filter just controls
   // whether numerals surface alongside regular nouns.
+  //
+  // Ordinals (ensimmäinen, kolmas, ...) and nolla also reach nouns.json via
+  // the adjective/noun extract. Where both entries decline the same way, drop
+  // the nouns.json copy so the word is served once and the Numerals filter
+  // controls it. A homograph with its own paradigm — kuusi "spruce" (kuusen)
+  // vs kuusi "six" (kuuden) — is a different word and keeps both.
+  const PRINCIPAL = ["nominative_singular", "genitive_singular", "partitive_singular"];
+  const numeralByWord = new Map(numerals.words.map((w) => [w.word, w]));
+  nouns.words = nouns.words.filter((w) => {
+    const n = numeralByWord.get(w.word);
+    return !n || PRINCIPAL.some((k) => w.inflections[k] !== n.inflections[k]);
+  });
   for (const w of numerals.words) {
     nouns.words.push({ ...w, group: "numeral" });
   }

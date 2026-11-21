@@ -28,7 +28,8 @@
     "sekaisin", "tosin", "kotoisin", "aikaisin", "öisin", "iltaisin",
     "aamuisin", "kesäisin", "viikonloppuisin", "rinnakkain", "jäisin",
     "paljain", "jaloin", "parahin", "kaunehin", "rakkahin",
-    "taka-", "esi-", "ulko-", "pika-", "sisä-", "kauko-", "ala-", "ylä-", "lähi-", "keski-", "seka-", "liki-", "etä-"
+    "taka-", "esi-", "ulko-", "pika-", "sisä-", "kauko-", "ala-", "ylä-", "lähi-", "keski-", "seka-", "liki-", "etä-",
+    "college", "oy", "tosi-tv", "taka"
   ],
   "verbs": [
     "ei", "eikä", "tarvii", "dallaa", "seistä",
@@ -42,6 +43,7 @@
     "kullastaa", "rankaista", "pohtaa",
     "saastata", "iloittaa", "ylttää", "tervehtää", "puistaa", "kuvioittaa",
     "solmita", "tarttee", "juleta", "pieksää", "loppuunmyydä", "varjota",
-    "reunata", "vanhettaa", "suoria"
+    "reunata", "vanhettaa", "suoria",
+    "kutiaa", "virkkaa"
   ]
 }

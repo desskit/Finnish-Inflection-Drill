@@ -34,6 +34,12 @@ function getTodayDate() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// Reviews recorded today. todayCount only resets on the next recorded
+// outcome, so a count from yesterday must read as 0 until then.
+export function reviewsToday(stats) {
+  return stats.todayDate === getTodayDate() ? (stats.todayCount || 0) : 0;
+}
+
 export function defaultStats() {
   return {
     totals:         emptyBucket(),
@@ -56,22 +62,39 @@ export function defaultStats() {
   };
 }
 
+const isPlainObject = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+const objOr = (x) => (isPlainObject(x) ? x : {});
+
 export function loadStats() {
-  const stored = storage.load(KEY, null);
-  if (!stored) return defaultStats();
+  return normalizeStats(storage.load(KEY, null));
+}
+
+/**
+ * Coerce any stored or imported value into a complete stats object. Used on
+ * load and on import: an imported file with `"stats": {}` (or a bucket of the
+ * wrong type) would otherwise be stored as-is and crash the next
+ * recordOutcome(), freezing the drill.
+ */
+export function normalizeStats(stored) {
+  if (!isPlainObject(stored)) return defaultStats();
   // Merge in case new dimensions get added in a future version.
   const base = defaultStats();
+  const totals = { ...base.totals };
+  for (const k of Object.keys(totals)) {
+    const v = objOr(stored.totals)[k];
+    if (typeof v === "number" && Number.isFinite(v)) totals[k] = v;
+  }
   return {
-    totals: { ...base.totals, ...(stored.totals || {}) },
-    byNounCase:     stored.byNounCase     || {},
-    byNounGroup:    stored.byNounGroup    || {},
-    byVerbTense:    stored.byVerbTense    || {},
-    byVerbVoice:    stored.byVerbVoice    || {},
-    byVerbPolarity: stored.byVerbPolarity || {},
-    byVerbPerson:   stored.byVerbPerson   || {},
-    byVerbGroup:    stored.byVerbGroup    || {},
-    byRection:      stored.byRection      || {},
-    byItem:         stored.byItem         || {},
+    totals,
+    byNounCase:     objOr(stored.byNounCase),
+    byNounGroup:    objOr(stored.byNounGroup),
+    byVerbTense:    objOr(stored.byVerbTense),
+    byVerbVoice:    objOr(stored.byVerbVoice),
+    byVerbPolarity: objOr(stored.byVerbPolarity),
+    byVerbPerson:   objOr(stored.byVerbPerson),
+    byVerbGroup:    objOr(stored.byVerbGroup),
+    byRection:      objOr(stored.byRection),
+    byItem:         objOr(stored.byItem),
     // Migration: older stores don't have these fields. Leaving firstReviewAt
     // null means the first recordOutcome after update stamps "now" — we'd
     // rather under-report "avg/day since tracking started" than pretend we

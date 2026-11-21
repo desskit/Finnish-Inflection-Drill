@@ -16,8 +16,8 @@ import {
   loadPresets, savePresets, listNames,
   upsertPreset, deletePreset, getPreset,
 } from "./presets.js";
-import { loadSettings, saveSettings } from "./settings.js";
-import { loadStats, saveStats, resetStats, recordOutcome } from "./stats.js";
+import { loadSettings, saveSettings, sanitizeSettings } from "./settings.js";
+import { loadStats, saveStats, resetStats, recordOutcome, normalizeStats } from "./stats.js";
 import { renderStats } from "./stats_ui.js";
 import {
   loadSchedule, saveSchedule, resetSchedule,
@@ -423,6 +423,9 @@ function renderClozeLine() {
     const blank = document.createElement("span");
     blank.className = "cloze-blank";
     blank.textContent = "_____";
+    // The sentence's own spelling of the form, e.g. "Olen" at the start of
+    // a sentence where the answer key stores "olen" — restored on reveal.
+    blank.dataset.text = m[0];
     el.clozeFi.appendChild(blank);
     lastIdx = m.index + m[0].length;
   }
@@ -442,7 +445,7 @@ function revealCloze() {
   if (!clozeActive() || !state.current) return;
   const expected = state.current.word.inflections[state.current.key];
   for (const blank of el.clozeFi.querySelectorAll(".cloze-blank")) {
-    blank.textContent = expected;
+    blank.textContent = blank.dataset.text || expected;
     blank.classList.add("filled");
   }
 }
@@ -566,6 +569,9 @@ function speakHeadword() {
 
 function speakAnswer() {
   if (!state.current) return;
+  // Hearing the answer is a giveaway in a test and a free hint in Blitz —
+  // same rule as auto-play below.
+  if (testActive() || blitzActive()) return;
   const ch = state.current;
   const expected = ch.answer !== undefined ? ch.answer : ch.word.inflections[ch.key];
   speak(expected);
@@ -612,9 +618,9 @@ function updateStatus() {
     } else if (clozeActive()) {
       suffix = " \u2014 no example sentences match these filters; broaden them or switch to Standard";
     } else if (possessiveActive()) {
-      suffix = " \u2014 no possessive data within the current filters; enable more noun groups above";
+      suffix = " \u2014 nothing matches these filters; enable more cases, word types or possessors above";
     } else if (comparativeActive()) {
-      suffix = " \u2014 no adjectives within the current filters; enable more word types or degrees above";
+      suffix = " \u2014 nothing matches these filters; enable more cases, word types or degrees above";
     } else {
       suffix = " \u2014 all filtered out, enable something above";
     }
@@ -782,6 +788,11 @@ function openTestModal() {
     alert("Finish or cancel the current Blitz round before starting a test.");
     return;
   }
+  // Starting over mid-test would silently reset the progress counter.
+  if (testActive()) {
+    if (!confirm("Start a new test? The current one will be cancelled.")) return;
+    cancelTest();
+  }
   // Pre-fill with the user's last-used length.
   el.testLength.value = String(state.settings.testLength);
   el.testStartModal.classList.remove("hidden");
@@ -791,6 +802,8 @@ function openTestModal() {
 
 function closeTestStartModal() {
   el.testStartModal.classList.add("hidden");
+  // Cancel/Escape would otherwise leave focus on the hidden dialog's button.
+  if (state.view === "drill" && !rectionActive()) el.answer.focus();
 }
 
 function startTest() {
@@ -828,6 +841,9 @@ function finishTest() {
   el.testHud.classList.add("hidden");
   renderTestResults();
   el.testResultModal.classList.remove("hidden");
+  // Move focus into the dialog: left in the answer input behind it, Enter
+  // and the shortcuts would target the hidden card.
+  el.testResultDone.focus();
   // GA: one event per completed test with aggregate outcome counts. Cheaper
   // than a per-question event (per-question already goes through score()),
   // and captures the "how did this attempt go" shape at test granularity.
@@ -931,6 +947,15 @@ function testActive() {
   return state.test && !state.test.finished;
 }
 
+// True while any dialog (inflection table, KPT, Test/Blitz start or result)
+// is open. Focus can still be in the answer input behind it, so the answer
+// shortcuts, auto-advance and auto-focus all check this to avoid acting on a
+// challenge the user can't see.
+function dialogOpen() {
+  // Test/KPT/inflection dialogs use .test-modal; the Blitz ones .blitz-modal.
+  return !!document.querySelector(".test-modal:not(.hidden), .blitz-modal:not(.hidden)");
+}
+
 // Confirm-and-cancel before navigating away from the drill view. Returns
 // false if the user backed out of any confirm, true if it's safe to proceed.
 // Centralized so both Options and About switches behave the same.
@@ -958,6 +983,9 @@ function blitzActive() {
 }
 
 function openBlitzModal() {
+  // The launch button is hidden during a round, but guard anyway: starting a
+  // second round over a running one would orphan its timer.
+  if (blitzActive()) return;
   if (rectionActive()) {
     setStatus("Blitz isn't available in the Rection style — switch to Standard or Cloze first.");
     return;
@@ -975,10 +1003,13 @@ function openBlitzModal() {
   setBlitzDurationSelection(d);
   renderBlitzStartBest(d);
   el.blitzStartModal.classList.remove("hidden");
+  el.blitzStartGo.focus(); // Enter starts the round, like the Test dialog
 }
 
 function closeBlitzStartModal() {
   el.blitzStartModal.classList.add("hidden");
+  // Same as the Test dialog: don't strand focus on a hidden button.
+  if (state.view === "drill" && !rectionActive()) el.answer.focus();
 }
 
 function setBlitzDurationSelection(duration) {
@@ -1005,6 +1036,9 @@ function startBlitz() {
   // Cancel any in-flight speech from a previous challenge — blitz has no
   // audio, and we don't want a stale TTS utterance trailing into the round.
   cancelSpeech();
+  // A previous round's interval must never survive into this one.
+  if (state.blitz) clearInterval(state.blitz.timerId);
+  setFeedback("");
 
   state.blitz = {
     active: true,
@@ -1117,7 +1151,9 @@ function blitzSubmit() {
     b.wrongFlashUntil = Date.now() + 800;
     updateBlitzHud();
     setTimeout(() => {
-      if (!blitzActive()) return; // round may have ended during the flash
+      // The round may have ended, been cancelled, or been replaced by a new
+      // one during the flash — only advance the round that scheduled this.
+      if (state.blitz !== b || !b.active) return;
       newBlitzChallenge();
     }, 800);
   }
@@ -1171,6 +1207,7 @@ function endBlitz() {
 
   el.blitzShareFeedback.textContent = "";
   el.blitzResultModal.classList.remove("hidden");
+  el.blitzResultDone.focus(); // into the dialog, not the answer input behind it
 }
 
 function cancelBlitz() {
@@ -1182,6 +1219,9 @@ function cancelBlitz() {
   document.body.classList.remove("blitz-mode");
   el.blitzHud.classList.add("hidden");
   el.answer.classList.remove("blitz-flash-ok", "blitz-flash-bad");
+  // A cancel during the wrong-answer flash would otherwise leave
+  // "✗ was: …" above the (now unscored) card.
+  setFeedback("");
 }
 
 function shareBlitzResult() {
@@ -1292,8 +1332,9 @@ function newChallenge(opts) {
   // a hidden answer input while the user is interacting with Options — and
   // skip it entirely when the caller asked us to (filter toggles, preset
   // applies) so we don't scroll mobile users away from the control they're
-  // touching.
-  if (state.view === "drill" && !rectionActive() && !(opts && opts.suppressFocus)) {
+  // touching. Never steal focus from an open dialog (e.g. a late auto-advance
+  // landing while the Test start dialog's length field is focused).
+  if (state.view === "drill" && !rectionActive() && !(opts && opts.suppressFocus) && !dialogOpen()) {
     el.answer.focus();
   }
 }
@@ -1306,10 +1347,11 @@ function submit() {
   if (blitzActive()) { blitzSubmit(); return; }
 
   // Dead zone between a blitz round ending and the user dismissing the
-  // result modal. state.current may still be set, and without this guard
-  // an Enter press would fall through to the normal drill submit path and
-  // score a challenge the user never actually intended to answer.
-  if (state.blitz && !state.blitz.active) return;
+  // result modal, or any dialog open over the card. state.current may still
+  // be set, and without this guard an Enter press would fall through to the
+  // normal drill submit path and score a challenge the user never actually
+  // intended to answer.
+  if (answerLocked()) return;
 
   // In an active test we run a tighter loop: silent feedback, record,
   // immediate advance. Stats still update via score().
@@ -1340,11 +1382,15 @@ function submit() {
     // old 900ms timeout fired mid-utterance and newChallenge() cancels
     // speech. The speak() promise resolves on the utterance's `end` event
     // (or a safety timeout); we add a small buffer so the last phoneme
-    // isn't clipped by the incoming cancelSpeech(). The awaitingNext guard
-    // prevents a double-advance if the user pressed Enter/Skip first.
+    // isn't clipped by the incoming cancelSpeech(). Only advance the
+    // challenge that scheduled this: if the user already pressed Enter, a
+    // newer challenge may be awaiting its own Enter, and advancing it would
+    // skip its feedback. Hold off while a dialog is open (e.g. the user
+    // tapped the headword for the table) — Enter advances once it closes.
+    const answered = state.current;
     maybeAutoPlayAnswer().then(() => {
       setTimeout(() => {
-        if (state.awaitingNext) newChallenge();
+        if (state.awaitingNext && state.current === answered && !dialogOpen()) newChallenge();
       }, state.settings.autoPlayAudio ? 200 : 450);
     });
   } else if (state.settings.requireCorrect) {
@@ -1356,7 +1402,8 @@ function submit() {
   } else {
     score("wrong");
     buzzIfWrong();
-    setFeedback(`\u2717 expected: ${result.expected}`, "bad");
+    const alts = state.current.accept || [];
+    setFeedback(`\u2717 expected: ${[result.expected, ...alts].join(" or ")}`, "bad");
     revealCloze();
     maybeAutoPlayAnswer();
     state.awaitingNext = true;
@@ -1371,15 +1418,33 @@ function buzzIfWrong() {
   try { navigator.vibrate(40); } catch { /* ignore */ }
 }
 
+// True when the answer controls must not act: a dialog is open over the
+// card, or a Blitz round has ended and its result is waiting to be
+// dismissed. Without this, shortcut keys typed with focus still in the
+// answer input behind a dialog would score a challenge the user can't see.
+function answerLocked() {
+  return dialogOpen() || !!(state.blitz && !state.blitz.active);
+}
+
+// Letter comparison for the Next-letter hint, matching checkAnswer's
+// normalization: case-insensitive, and any apostrophe-like character equals
+// any other (the data stores ’ in forms like ko’oissa; keyboards type ').
+const APOSTROPHES = /[‘’‚‛ʼ´`]/g;
+function sameLetter(a, b) {
+  return a.toLowerCase().replace(APOSTROPHES, "'") === b.toLowerCase().replace(APOSTROPHES, "'");
+}
+
 function revealNextLetter() {
   if (!state.current || state.awaitingNext) return;
+  if (answerLocked()) return;
   if (blitzActive()) return;   // hints disabled during blitz
   if (rectionActive()) return; // no typed answer to reveal letters of
   const ch = state.current;
   const expected = ch.answer !== undefined ? ch.answer : ch.word.inflections[ch.key];
   const input = el.answer.value;
   let correctPrefixLen = 0;
-  while (correctPrefixLen < input.length && correctPrefixLen < expected.length && input[correctPrefixLen] === expected[correctPrefixLen]) {
+  while (correctPrefixLen < input.length && correctPrefixLen < expected.length &&
+         sameLetter(input[correctPrefixLen], expected[correctPrefixLen])) {
     correctPrefixLen++;
   }
   if (correctPrefixLen >= expected.length) return;
@@ -1401,6 +1466,9 @@ function revealNextLetter() {
     revealCloze();
     maybeAutoPlayAnswer();
     state.awaitingNext = true;
+    // Back to the input so Enter advances, even after a mouse click on the
+    // hint button (which would otherwise keep focus and re-click on Enter).
+    el.answer.focus();
   } else {
     el.answer.focus();
     el.answer.setSelectionRange(el.answer.value.length, el.answer.value.length);
@@ -1409,6 +1477,7 @@ function revealNextLetter() {
 
 function showFullAnswer() {
   if (!state.current) return;
+  if (answerLocked()) return;
   if (blitzActive()) return;   // hints disabled during blitz
   if (rectionActive()) return; // multiple choice — nothing to type-reveal
   if (testActive()) {
@@ -1425,10 +1494,12 @@ function showFullAnswer() {
   score("shown");
   maybeAutoPlayAnswer();
   state.awaitingNext = true;
+  el.answer.focus(); // so Enter advances after a mouse click (see above)
 }
 
 function skipChallenge() {
   if (!state.current) return;
+  if (answerLocked()) return;
   if (blitzActive()) return;   // skip disabled during blitz
   if (testActive()) {
     score("skipped");
@@ -1659,6 +1730,7 @@ function openInflectionTable() {
   }
   track("inflection_table_open", { mode: state.mode });
   el.inflectionModal.classList.remove("hidden");
+  el.inflectionClose.focus(); // so Tab and Enter act inside the dialog
 }
 
 function closeInflectionTable() {
@@ -1891,6 +1963,10 @@ function applyPreset(name) {
   rebuildPool({ suppressFocus: true });
 }
 
+// Presets are stored as keys of a plain object, where these names would hit
+// the prototype instead of creating an entry.
+const RESERVED_PRESET_NAMES = new Set(["__proto__", "constructor", "prototype"]);
+
 function saveCurrentAsPreset() {
   // Prompt for a name. If the name is already taken, confirm before
   // overwriting — otherwise a typo could silently clobber a good preset.
@@ -1898,6 +1974,10 @@ function saveCurrentAsPreset() {
   if (raw === null) return; // user cancelled
   const name = raw.trim();
   if (!name) return;
+  if (RESERVED_PRESET_NAMES.has(name)) {
+    alert(`"${name}" can't be used as a preset name — please pick another.`);
+    return;
+  }
   const existing = listNames(state.presets, state.mode);
   if (existing.includes(name)) {
     if (!confirm(`Preset "${name}" already exists. Overwrite it?`)) return;
@@ -1919,10 +1999,13 @@ function removePreset(name) {
 function openKptModal() {
   if (el.kptBody.childElementCount === 0) renderKptTable();
   el.kptModal.classList.remove("hidden");
+  el.kptClose.focus(); // so Tab and Enter act inside the dialog
 }
 
 function closeKptModal() {
   el.kptModal.classList.add("hidden");
+  // Same as the inflection table: send the user back to typing.
+  if (state.view === "drill" && !rectionActive()) el.answer.focus();
 }
 
 function renderKptTable() {
@@ -2106,7 +2189,7 @@ async function boot() {
       if (e.target === el.testStartModal) closeTestStartModal();
     });
     el.testCancel.addEventListener("click", () => {
-      if (confirm("Cancel the current test? Answers so far will be discarded.")) {
+      if (confirm("Cancel the current test? You won't get a score, but answers so far stay in your stats.")) {
         cancelTest();
       }
     });
@@ -2189,6 +2272,11 @@ async function boot() {
       el.importStatsFile.value = "";
     });
 
+    // Like the submit button: keep focus in the answer input on press, so the
+    // mobile keyboard stays up and Enter keeps working after a click.
+    for (const btn of [el.hintLetter, el.hintAnswer, el.skip]) {
+      btn.addEventListener("mousedown", (e) => e.preventDefault());
+    }
     el.hintLetter.addEventListener("click", revealNextLetter);
     el.hintAnswer.addEventListener("click", showFullAnswer);
     el.skip.addEventListener("click", skipChallenge);
@@ -2271,7 +2359,7 @@ async function boot() {
       if (!rectionActive() || state.view !== "drill" || !state.current) return;
       const t = e.target;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
-      if (!el.inflectionModal.classList.contains("hidden")) return;
+      if (dialogOpen()) return;
       if (e.key === "Enter") {
         if (state.awaitingNext) { e.preventDefault(); newChallenge(); }
         return;
@@ -2294,9 +2382,17 @@ async function boot() {
     }
 
     el.answer.addEventListener("keydown", (e) => {
+      // With a dialog open over the card, none of these may act on the
+      // hidden challenge (Enter/shortcuts would score it behind the dialog).
+      if (dialogOpen() && (e.key === "Enter" || e.key === ";" || e.key === "-" || e.key === ".")) {
+        e.preventDefault();
+        return;
+      }
       if (e.key === "Enter") { e.preventDefault(); submit();            return; }
       if (e.key === ";")     { e.preventDefault(); revealNextLetter();  return; }
-      if (e.key === "-")     { e.preventDefault(); skipChallenge();     return; }
+      // "-" skips only from an empty answer box. Hyphens occur inside real
+      // answers (kuorma-autossa, ensi-illassa) — mid-word it must type.
+      if (e.key === "-" && el.answer.value === "") { e.preventDefault(); skipChallenge(); return; }
       if (e.key === ".")     { e.preventDefault(); showFullAnswer();    return; }
       // No shortcut for speak-answer: Finnish uses ' in words like raa'an,
       // so we must let the apostrophe key type. Click the Speak button instead.
@@ -2346,7 +2442,8 @@ async function importStats(file) {
   try {
     const text = await file.text();
     const data = JSON.parse(text);
-    if (!data || data.app !== "finnish-inflection-drill" || !data.stats) {
+    const isObj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+    if (!isObj(data) || data.app !== "finnish-inflection-drill" || !isObj(data.stats)) {
       throw new Error("file doesn't look like a drill export");
     }
     // Schema check. Files missing the field are assumed to be pre-1.0
@@ -2363,9 +2460,11 @@ async function importStats(file) {
       setImportFeedback("Import cancelled.", "");
       return;
     }
-    state.stats = data.stats;
+    // Normalize everything before storing: a file with a partial or
+    // wrongly-typed section would otherwise crash the next answer.
+    state.stats = normalizeStats(data.stats);
     saveStats(state.stats);
-    if (data.settings) {
+    if (isObj(data.settings)) {
       state.settings = { ...state.settings, ...data.settings };
       // Legacy imports might still carry weightedSampling; translate it the
       // same way loadSettings() does so the UI below shows the right state.
@@ -2374,6 +2473,7 @@ async function importStats(file) {
         state.settings.priorityMode = data.settings.weightedSampling ? "srs" : "uniform";
       }
       delete state.settings.weightedSampling;
+      state.settings = sanitizeSettings(state.settings);
       saveSettings(state.settings);
       // Reflect any changed UI-bound settings immediately.
       el.settingRequire.checked     = state.settings.requireCorrect;
@@ -2395,19 +2495,24 @@ async function importStats(file) {
       updateAnswerPlaceholder();
       applyRectionChrome();
     }
-    if (data.schedule && data.schedule.byItem) {
+    if (isObj(data.schedule) && isObj(data.schedule.byItem)) {
       state.schedule = { byItem: data.schedule.byItem };
       saveSchedule(state.schedule);
     }
-    if (data.presets && (data.presets.noun || data.presets.verb)) {
+    if (isObj(data.presets) && (isObj(data.presets.noun) || isObj(data.presets.verb))) {
+      // Keep only well-formed entries: a preset that isn't a filter object
+      // would crash the filter panel when applied.
+      const validPresets = (m) => Object.fromEntries(
+        Object.entries(isObj(m) ? m : {}).filter(([name, f]) => isObj(f) && !RESERVED_PRESET_NAMES.has(name))
+      );
       state.presets = {
-        noun: data.presets.noun || {},
-        verb: data.presets.verb || {},
+        noun: validPresets(data.presets.noun),
+        verb: validPresets(data.presets.verb),
       };
       savePresets(state.presets);
       renderPresets();
     }
-    if (data.streak) {
+    if (isObj(data.streak)) {
       state.streak = checkStreakExpired({ ...state.streak, ...data.streak });
       saveStreak(state.streak);
       renderStreak();
@@ -2435,13 +2540,20 @@ function setImportFeedback(text, cls) {
 // this, the user has to refresh twice to pick up the new version (first
 // refresh loads the cached old shell, second refresh gets the new one). The
 // banner bridges that gap — one click and the page reloads onto the new SW.
+// Set when we ask a waiting worker to take over. Only then should the
+// resulting controllerchange reload the page: on a first visit the new worker
+// also claims the page (clients.claim() in sw.js), and reloading then would
+// throw away whatever the user is doing — a test in progress, a typed answer
+// — for no benefit, since the page already runs the current code.
+let swUpdateRequested = false;
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     // Wire controllerchange BEFORE registration so it's ready before any
     // SKIP_WAITING message can be sent.
     let swRefreshing = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (swRefreshing) return;
+      if (swRefreshing || !swUpdateRequested) return;
       swRefreshing = true;
       location.reload();
     });
@@ -2451,6 +2563,7 @@ if ("serviceWorker" in navigator) {
         // A new SW is already waiting (e.g. installed on a previous visit).
         // Apply it immediately on load — no banner needed.
         if (reg.waiting) {
+          swUpdateRequested = true;
           reg.waiting.postMessage({ type: "SKIP_WAITING" });
           return;
         }
@@ -2472,18 +2585,25 @@ function wireUpdateBanner(reg) {
   const hide = () => banner.classList.add("hidden");
 
   function applyUpdate() {
-    if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
-    else location.reload();
+    if (reg.waiting) {
+      swUpdateRequested = true;
+      reg.waiting.postMessage({ type: "SKIP_WAITING" });
+    } else {
+      location.reload();
+    }
   }
 
-  // Background update: new SW finished installing — show banner.
-  // Drop the navigator.serviceWorker.controller guard so this works
-  // even if the page was loaded via hard-refresh (controller is null then).
+  // Background update: new SW finished installing — show banner. Only when
+  // an older worker is already active: on a first visit the newly installed
+  // worker is the only one and the page is already current. (reg.active
+  // rather than navigator.serviceWorker.controller, so this still works when
+  // the page was loaded via hard-refresh and has no controller.)
   reg.addEventListener("updatefound", () => {
     const nw = reg.installing;
     if (!nw) return;
+    const isUpdate = !!reg.active;
     nw.addEventListener("statechange", () => {
-      if (nw.state === "installed") show();
+      if (nw.state === "installed" && isUpdate) show();
     });
   });
 
