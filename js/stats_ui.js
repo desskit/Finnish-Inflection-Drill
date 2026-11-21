@@ -106,7 +106,8 @@ function renderTable(rows, labelFor) {
 
 function sortRows(rows, sortBy) {
   const sorted = rows.slice();
-  const cmpWord = (a, b) => a.word.localeCompare(b.word);
+  // Finnish collation: å, ä, ö sort after z (äiti after auto, not beside it).
+  const cmpWord = (a, b) => a.word.localeCompare(b.word, "fi");
   switch (sortBy) {
     case "most-attempts":
       sorted.sort((a, b) => (b.attempts - a.attempts) || cmpWord(a, b));

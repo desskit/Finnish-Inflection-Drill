@@ -66,7 +66,7 @@
 
   --text:          #161a22;
   --text-dim:      #3a4150;
-  --muted:         #6b7280;
+  --muted:         #5f6673;   /* ≥ 4.5:1 (WCAG AA) on --panel-2, where the seg buttons sit */
   --muted-soft:    #9aa0ac;
 
   --accent:        #2f5bd1;
@@ -76,7 +76,7 @@
   --on-accent:     #ffffff;
   --danger:        #c2362f;
   --danger-soft:   rgba(194, 54, 47, 0.10);
-  --ok:            #1f8f3c;
+  --ok:            #1a7f35;   /* ≥ 4.5:1 on white for the accuracy cells */
   --ok-soft:       rgba(31, 143, 60, 0.10);
   --warn:          #a16207;
 
@@ -676,7 +676,7 @@ kbd {
 .group-row:hover { background: var(--accent-wash); }
 .group-row input[type="checkbox"] { cursor: pointer; accent-color: var(--accent); }
 .group-label   { color: var(--text); }
-.group-example { color: var(--muted); font-size: 0.85em; font-style: italic; }
+.group-example { color: var(--muted); font-size: 0.85em; font-style: italic; min-width: 0; overflow-wrap: anywhere; }
 
 /* Update banner — fixed strip at the top of the viewport. Intentionally
  * narrow on z-index budget (z: 50) so modal-style dialogs (confirm, prompt)
@@ -1186,7 +1186,9 @@ details[open] .gradation-summary h2::before { content: "▼ "; }
 }
 .seg-btn:hover  { color: var(--text); }
 .seg-btn:active { transform: scale(0.96); }
-.beta-tag { font-size: 0.7em; opacity: 0.65; }
+/* No opacity: at 0.7em it was well under readable contrast (2.4:1 in the
+ * light theme). The smaller size alone sets it apart from the label. */
+.beta-tag { font-size: 0.7em; }
 .seg-btn.active {
   background: linear-gradient(180deg, var(--accent), var(--accent-soft));
   color: var(--on-accent);
@@ -1210,7 +1212,7 @@ details[open] .gradation-summary h2::before { content: "▼ "; }
   white-space: nowrap;
 }
 :root[data-theme="light"] .streak-badge {
-  color: #b8761f;
+  color: #8a5413;   /* ≥ 4.5:1 on the badge's tinted background */
   background: rgba(240, 166, 74, 0.16);
   border-color: rgba(240, 166, 74, 0.45);
 }
@@ -1509,8 +1511,11 @@ details[open] .gradation-summary h2::before { content: "▼ "; }
   .stats-overall { font-size: 0.95rem; }
   .headword     { font-size: 2rem; }
   .challenge    { padding: 1.6rem 1rem; }
+  /* Hiding the secondary columns makes most tables fit, so no scrollbar in
+   * the common case — but a long lemma (kaksinkertainen) can still push a
+   * table past the card. .stats-section keeps its overflow-x: auto, so that
+   * table scrolls inside the card instead of widening the whole page. */
   .mob-hide     { display: none; }
-  .stats-section { overflow-x: unset; }
 }
 
 /* Touch devices: bigger tap targets on the controls used mid-drill. */

@@ -10,7 +10,7 @@
 // ⚠️ BUMP `CACHE_VERSION` whenever you ship app-shell changes that users need
 //    to pick up. Without a bump, they'll keep the old cached files forever.
 
-const CACHE_VERSION = "finnish-drill-v1.9.3";
+const CACHE_VERSION = "finnish-drill-v1.9.4";
 
 // Files required for the app to boot offline. Paths are relative so this
 // works under any base path (e.g. GitHub Pages project site).
@@ -99,8 +99,13 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
+  // Page loads with a query string (shared links carrying ?utm_source=…) are
+  // the same app shell: match the cached page ignoring the query, or they
+  // fail offline.
+  const matchOpts = req.mode === "navigate" ? { ignoreSearch: true } : undefined;
+
   event.respondWith(
-    caches.match(req).then((cached) => {
+    caches.match(req, matchOpts).then((cached) => {
       if (cached) return cached;
       return fetch(req).then((res) => {
         // Stash a copy of successful responses so subsequent offline loads work.

@@ -192,6 +192,9 @@ function renderCaseGrid(cfg, state, changed) {
       const key = `${c.id}_${n.id}`;
       const cb = document.createElement("input");
       cb.type = "checkbox";
+      // The grid's row/column headers aren't labels, so name each box for
+      // screen readers ("inessive singular") rather than a bare "checkbox".
+      cb.setAttribute("aria-label", `${c.label} ${n.label.toLowerCase()}`);
       cb.checked = !!state.cases[key];
       cb.addEventListener("change", () => {
         state.cases[key] = cb.checked;

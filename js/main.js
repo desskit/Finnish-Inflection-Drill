@@ -802,6 +802,8 @@ function openTestModal() {
 
 function closeTestStartModal() {
   el.testStartModal.classList.add("hidden");
+  // Cancel/Escape would otherwise leave focus on the hidden dialog's button.
+  if (state.view === "drill" && !rectionActive()) el.answer.focus();
 }
 
 function startTest() {
@@ -839,6 +841,9 @@ function finishTest() {
   el.testHud.classList.add("hidden");
   renderTestResults();
   el.testResultModal.classList.remove("hidden");
+  // Move focus into the dialog: left in the answer input behind it, Enter
+  // and the shortcuts would target the hidden card.
+  el.testResultDone.focus();
   // GA: one event per completed test with aggregate outcome counts. Cheaper
   // than a per-question event (per-question already goes through score()),
   // and captures the "how did this attempt go" shape at test granularity.
@@ -947,7 +952,8 @@ function testActive() {
 // shortcuts, auto-advance and auto-focus all check this to avoid acting on a
 // challenge the user can't see.
 function dialogOpen() {
-  return !!document.querySelector(".test-modal:not(.hidden)");
+  // Test/KPT/inflection dialogs use .test-modal; the Blitz ones .blitz-modal.
+  return !!document.querySelector(".test-modal:not(.hidden), .blitz-modal:not(.hidden)");
 }
 
 // Confirm-and-cancel before navigating away from the drill view. Returns
@@ -997,10 +1003,13 @@ function openBlitzModal() {
   setBlitzDurationSelection(d);
   renderBlitzStartBest(d);
   el.blitzStartModal.classList.remove("hidden");
+  el.blitzStartGo.focus(); // Enter starts the round, like the Test dialog
 }
 
 function closeBlitzStartModal() {
   el.blitzStartModal.classList.add("hidden");
+  // Same as the Test dialog: don't strand focus on a hidden button.
+  if (state.view === "drill" && !rectionActive()) el.answer.focus();
 }
 
 function setBlitzDurationSelection(duration) {
@@ -1198,6 +1207,7 @@ function endBlitz() {
 
   el.blitzShareFeedback.textContent = "";
   el.blitzResultModal.classList.remove("hidden");
+  el.blitzResultDone.focus(); // into the dialog, not the answer input behind it
 }
 
 function cancelBlitz() {
@@ -1720,6 +1730,7 @@ function openInflectionTable() {
   }
   track("inflection_table_open", { mode: state.mode });
   el.inflectionModal.classList.remove("hidden");
+  el.inflectionClose.focus(); // so Tab and Enter act inside the dialog
 }
 
 function closeInflectionTable() {
@@ -1988,6 +1999,7 @@ function removePreset(name) {
 function openKptModal() {
   if (el.kptBody.childElementCount === 0) renderKptTable();
   el.kptModal.classList.remove("hidden");
+  el.kptClose.focus(); // so Tab and Enter act inside the dialog
 }
 
 function closeKptModal() {
@@ -2528,13 +2540,20 @@ function setImportFeedback(text, cls) {
 // this, the user has to refresh twice to pick up the new version (first
 // refresh loads the cached old shell, second refresh gets the new one). The
 // banner bridges that gap — one click and the page reloads onto the new SW.
+// Set when we ask a waiting worker to take over. Only then should the
+// resulting controllerchange reload the page: on a first visit the new worker
+// also claims the page (clients.claim() in sw.js), and reloading then would
+// throw away whatever the user is doing — a test in progress, a typed answer
+// — for no benefit, since the page already runs the current code.
+let swUpdateRequested = false;
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     // Wire controllerchange BEFORE registration so it's ready before any
     // SKIP_WAITING message can be sent.
     let swRefreshing = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (swRefreshing) return;
+      if (swRefreshing || !swUpdateRequested) return;
       swRefreshing = true;
       location.reload();
     });
@@ -2544,6 +2563,7 @@ if ("serviceWorker" in navigator) {
         // A new SW is already waiting (e.g. installed on a previous visit).
         // Apply it immediately on load — no banner needed.
         if (reg.waiting) {
+          swUpdateRequested = true;
           reg.waiting.postMessage({ type: "SKIP_WAITING" });
           return;
         }
@@ -2565,18 +2585,25 @@ function wireUpdateBanner(reg) {
   const hide = () => banner.classList.add("hidden");
 
   function applyUpdate() {
-    if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
-    else location.reload();
+    if (reg.waiting) {
+      swUpdateRequested = true;
+      reg.waiting.postMessage({ type: "SKIP_WAITING" });
+    } else {
+      location.reload();
+    }
   }
 
-  // Background update: new SW finished installing — show banner.
-  // Drop the navigator.serviceWorker.controller guard so this works
-  // even if the page was loaded via hard-refresh (controller is null then).
+  // Background update: new SW finished installing — show banner. Only when
+  // an older worker is already active: on a first visit the newly installed
+  // worker is the only one and the page is already current. (reg.active
+  // rather than navigator.serviceWorker.controller, so this still works when
+  // the page was loaded via hard-refresh and has no controller.)
   reg.addEventListener("updatefound", () => {
     const nw = reg.installing;
     if (!nw) return;
+    const isUpdate = !!reg.active;
     nw.addEventListener("statechange", () => {
-      if (nw.state === "installed") show();
+      if (nw.state === "installed" && isUpdate) show();
     });
   });
 
